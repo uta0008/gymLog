@@ -219,7 +219,8 @@
         </div>
         <div class="field">
           <label>種目</label>
-          <input id="in-exercise" type="text" placeholder="例：ベンチプレス">
+          <input id="in-exercise" type="text" list="exercise-datalist" placeholder="例：ベンチプレス" autocomplete="off">
+          <datalist id="exercise-datalist"></datalist>
         </div>
         <div class="row2">
           <div class="field">
@@ -481,6 +482,30 @@
   }
   function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
+  /* ---------- exercise history helpers ---------- */
+  function workoutsForPartSorted(p){
+    return state.workouts.filter(function(w){ return w.bodyPart===p && w.exercise; })
+      .sort(function(a,b){
+        if(a.date!==b.date) return a.date<b.date ? 1 : -1;
+        return a.id<b.id ? 1 : -1;
+      });
+  }
+  function lastExerciseForPart(p){
+    var list = workoutsForPartSorted(p);
+    return list.length ? list[0].exercise : '';
+  }
+  function exercisesForPart(p){
+    var seen = {}, result = [];
+    workoutsForPartSorted(p).forEach(function(w){
+      if(!seen[w.exercise]){ seen[w.exercise] = true; result.push(w.exercise); }
+    });
+    return result;
+  }
+  function updateExerciseSuggestions(p){
+    var dl = document.getElementById('exercise-datalist');
+    dl.innerHTML = exercisesForPart(p).map(function(ex){ return '<option value="'+esc(ex)+'">'; }).join('');
+  }
+
   /* ---------- rendering: LOG ---------- */
   function renderLog(){
     var dstr = toDateStr(logDate);
@@ -488,7 +513,15 @@
     document.getElementById('log-date-sub').textContent = (dstr===todayStr) ? '今日' : '';
 
     var sel = document.getElementById('in-part');
+    var prevSelected = sel.value;
     sel.innerHTML = state.bodyParts.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
+    if(state.bodyParts.indexOf(prevSelected)>=0) sel.value = prevSelected;
+    var curPart = sel.value;
+    updateExerciseSuggestions(curPart);
+    var exField = document.getElementById('in-exercise');
+    if(!editingId && !exField.value){
+      exField.value = lastExerciseForPart(curPart);
+    }
 
     var entries = state.workouts.filter(function(w){ return w.date===dstr; });
     var listEl = document.getElementById('log-list');
@@ -536,13 +569,21 @@
   var editingId = null;
   function cancelEdit(){
     editingId = null;
-    document.getElementById('in-exercise').value='';
     document.getElementById('in-weight').value='';
     document.getElementById('in-sets').value='';
+    document.getElementById('in-exercise').value = lastExerciseForPart(document.getElementById('in-part').value);
     document.getElementById('add-entry-btn').textContent = 'この日の記録を追加';
     document.getElementById('cancel-edit-btn').style.display = 'none';
   }
   document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
+
+  document.getElementById('in-part').addEventListener('change', function(){
+    var p = this.value;
+    updateExerciseSuggestions(p);
+    if(!editingId){
+      document.getElementById('in-exercise').value = lastExerciseForPart(p);
+    }
+  });
 
   document.getElementById('add-entry-btn').addEventListener('click', function(){
     var part = document.getElementById('in-part').value;
@@ -564,7 +605,6 @@
       var dstr = toDateStr(logDate);
       if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
       state.schedule[dstr].actual = true;
-      document.getElementById('in-exercise').value='';
       document.getElementById('in-weight').value='';
       document.getElementById('in-sets').value='';
     }
