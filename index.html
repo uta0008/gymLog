@@ -101,6 +101,16 @@
   .row2 .field{flex:1;}
   .row2.row3 .field{min-width:0;}
   .row2.row3 input{padding:9px 6px;text-align:center;}
+  .erow-head{display:flex;gap:8px;margin-bottom:6px;padding:0 2px;}
+  .erow-head span{flex:1;font-size:11px;color:var(--text-muted);}
+  .entry-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .entry-row input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 8px;font-size:14px;font-family:inherit;text-align:center;}
+  .entry-row input:focus{outline:1px solid var(--blue);}
+  .erow-del{flex:none;width:30px;height:36px;background:none;border:none;color:var(--danger);font-size:17px;cursor:pointer;}
+  .erow-spacer{flex:none;width:30px;}
+  .rowaddbtn{width:100%;background:none;border:1px dashed var(--line);color:var(--text-muted);border-radius:8px;
+    padding:9px;font-size:12.5px;margin-bottom:12px;cursor:pointer;font-family:inherit;}
   .addbtn{width:100%;background:var(--blue);color:#08202F;border:none;border-radius:8px;padding:11px;
     font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
   .addbtn:active{opacity:.85;}
@@ -224,20 +234,11 @@
           <input id="in-exercise" type="text" list="exercise-datalist" placeholder="例：ベンチプレス" autocomplete="off">
           <datalist id="exercise-datalist"></datalist>
         </div>
-        <div class="row2 row3">
-          <div class="field">
-            <label>重量 (kg)</label>
-            <input id="in-weight" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">
-          </div>
-          <div class="field">
-            <label>回数</label>
-            <input id="in-reps" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
-          </div>
-          <div class="field">
-            <label>セット数</label>
-            <input id="in-sets" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
-          </div>
+        <div class="erow-head">
+          <span>重量 (kg)</span><span>回数</span>
         </div>
+        <div id="entry-rows"></div>
+        <button class="rowaddbtn" id="add-row-btn" type="button">＋ 行を追加</button>
         <button class="addbtn" id="add-entry-btn">この日の記録を追加</button>
         <button class="cancelbtn" id="cancel-edit-btn" style="display:none;">編集をキャンセル</button>
       </div>
@@ -536,6 +537,7 @@
     if(!editingId && !exField.value){
       exField.value = lastExerciseForPart(curPart);
     }
+    renderEntryRows();
 
     var entries = state.workouts.filter(function(w){ return w.date===dstr; });
     var listEl = document.getElementById('log-list');
@@ -544,10 +546,11 @@
     } else {
       listEl.innerHTML = entries.map(function(w){
         var reps = (w.reps===undefined || w.reps===null || w.reps==='') ? '' : (' × '+w.reps+'回');
+        var setsSuffix = (Number(w.sets)>1) ? (' × '+w.sets+'set') : '';
         return '<div class="entry">'+
           '<span class="etag">'+esc(w.bodyPart)+'</span>'+
           '<span class="ename">'+esc(w.exercise||'(種目未入力)')+'</span>'+
-          '<span class="eval">'+w.weight+'kg'+reps+' × '+w.sets+'set</span>'+
+          '<span class="eval">'+w.weight+'kg'+reps+setsSuffix+'</span>'+
           '<button class="eedit" data-edit="'+w.id+'">✎</button>'+
           '<button class="edel" data-del="'+w.id+'">×</button>'+
           '</div>';
@@ -573,9 +576,8 @@
         editingId = id;
         document.getElementById('in-part').value = w.bodyPart;
         document.getElementById('in-exercise').value = w.exercise || '';
-        document.getElementById('in-weight').value = w.weight;
-        document.getElementById('in-reps').value = (w.reps===undefined || w.reps===null) ? '' : w.reps;
-        document.getElementById('in-sets').value = w.sets;
+        entryRows = [{weight: (w.weight===undefined||w.weight===null)?'':String(w.weight), reps: (w.reps===undefined||w.reps===null)?'':String(w.reps)}];
+        renderEntryRows();
         document.getElementById('add-entry-btn').textContent = 'この記録を更新する';
         document.getElementById('cancel-edit-btn').style.display = 'block';
         document.getElementById('in-part').scrollIntoView({behavior:'smooth', block:'start'});
@@ -583,11 +585,42 @@
     });
   }
   var editingId = null;
+  var entryRows = [{weight:'', reps:''}];
+  function renderEntryRows(){
+    var editing = !!editingId;
+    var rows = editing ? entryRows.slice(0,1) : entryRows;
+    var container = document.getElementById('entry-rows');
+    container.innerHTML = rows.map(function(r, idx){
+      return '<div class="entry-row">'+
+        '<input type="number" inputmode="decimal" min="0" step="0.5" class="row-weight" data-idx="'+idx+'" value="'+(r.weight||'')+'" placeholder="0">'+
+        '<input type="number" inputmode="numeric" min="0" step="1" class="row-reps" data-idx="'+idx+'" value="'+(r.reps||'')+'" placeholder="0">'+
+        (!editing && rows.length>1 ? '<button class="erow-del" data-idx="'+idx+'" type="button">×</button>' : '<span class="erow-spacer"></span>')+
+        '</div>';
+    }).join('');
+    container.querySelectorAll('.row-weight').forEach(function(inp){
+      inp.addEventListener('input', function(){ entryRows[Number(inp.getAttribute('data-idx'))].weight = inp.value; });
+    });
+    container.querySelectorAll('.row-reps').forEach(function(inp){
+      inp.addEventListener('input', function(){ entryRows[Number(inp.getAttribute('data-idx'))].reps = inp.value; });
+    });
+    container.querySelectorAll('.erow-del').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var idx = Number(btn.getAttribute('data-idx'));
+        entryRows.splice(idx,1);
+        if(entryRows.length===0) entryRows.push({weight:'',reps:''});
+        renderEntryRows();
+      });
+    });
+    document.getElementById('add-row-btn').style.display = editing ? 'none' : 'block';
+  }
+  document.getElementById('add-row-btn').addEventListener('click', function(){
+    entryRows.push({weight:'', reps:''});
+    renderEntryRows();
+  });
   function cancelEdit(){
     editingId = null;
-    document.getElementById('in-weight').value='';
-    document.getElementById('in-reps').value='';
-    document.getElementById('in-sets').value='';
+    entryRows = [{weight:'', reps:''}];
+    renderEntryRows();
     document.getElementById('in-exercise').value = lastExerciseForPart(document.getElementById('in-part').value);
     document.getElementById('add-entry-btn').textContent = 'この日の記録を追加';
     document.getElementById('cancel-edit-btn').style.display = 'none';
@@ -605,27 +638,33 @@
   document.getElementById('add-entry-btn').addEventListener('click', function(){
     var part = document.getElementById('in-part').value;
     var exercise = document.getElementById('in-exercise').value.trim();
-    var weight = Number(document.getElementById('in-weight').value)||0;
-    var reps = Number(document.getElementById('in-reps').value)||0;
-    var sets = Number(document.getElementById('in-sets').value)||0;
-    if(!part || sets<=0){ return; }
+    if(!part){ return; }
     if(editingId){
+      var r = entryRows[0] || {weight:'',reps:''};
       var w = state.workouts.filter(function(x){ return x.id===editingId; })[0];
       if(w){
-        w.bodyPart = part; w.exercise = exercise; w.weight = weight; w.reps = reps; w.sets = sets;
+        w.bodyPart = part; w.exercise = exercise;
+        w.weight = Number(r.weight)||0; w.reps = Number(r.reps)||0;
       }
       cancelEdit();
     } else {
-      state.workouts.push({
-        id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
-        date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, reps: reps, sets: sets
-      });
       var dstr = toDateStr(logDate);
+      var created = false;
+      entryRows.forEach(function(r){
+        var hasWeight = r.weight !== '' && r.weight !== undefined && r.weight !== null;
+        var hasReps = r.reps !== '' && r.reps !== undefined && r.reps !== null;
+        if(!hasWeight && !hasReps) return;
+        state.workouts.push({
+          id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
+          date: dstr, bodyPart: part, exercise: exercise, weight: Number(r.weight)||0, reps: Number(r.reps)||0, sets: 1
+        });
+        created = true;
+      });
+      if(!created) return;
       if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
       state.schedule[dstr].actual = true;
-      document.getElementById('in-weight').value='';
-      document.getElementById('in-reps').value='';
-      document.getElementById('in-sets').value='';
+      entryRows = [{weight:'', reps:''}];
+      renderEntryRows();
     }
     scheduleSave();
     renderLog(); renderAll();
