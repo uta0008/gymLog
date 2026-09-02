@@ -99,6 +99,8 @@
   .field select:focus,.field input:focus{outline:1px solid var(--blue);}
   .row2{display:flex;gap:10px;}
   .row2 .field{flex:1;}
+  .row2.row3 .field{min-width:0;}
+  .row2.row3 input{padding:9px 6px;text-align:center;}
   .addbtn{width:100%;background:var(--blue);color:#08202F;border:none;border-radius:8px;padding:11px;
     font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
   .addbtn:active{opacity:.85;}
@@ -222,10 +224,14 @@
           <input id="in-exercise" type="text" list="exercise-datalist" placeholder="例：ベンチプレス" autocomplete="off">
           <datalist id="exercise-datalist"></datalist>
         </div>
-        <div class="row2">
+        <div class="row2 row3">
           <div class="field">
             <label>重量 (kg)</label>
             <input id="in-weight" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">
+          </div>
+          <div class="field">
+            <label>回数</label>
+            <input id="in-reps" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
           </div>
           <div class="field">
             <label>セット数</label>
@@ -275,7 +281,7 @@
     <section class="tab" id="tab-history">
       <div class="part-chips" id="hist-part-chips"></div>
       <div class="hist-block">
-        <p class="hist-title" id="hist-sets-title">週別セット数（直近8週）</p>
+        <p class="hist-title" id="hist-sets-title">週別総回数（直近8週）</p>
         <div class="hist-bars" id="hist-sets"></div>
       </div>
       <div class="hist-block">
@@ -340,7 +346,7 @@
   var state = {
     workouts: [],   // {id,date,bodyPart,exercise,weight,sets}
     schedule: {},   // dateStr -> {planned:bool, actual:bool}
-    goals: {},      // weekKey -> {bodyPart:{sets,weight}}
+    goals: {},      // weekKey -> {bodyPart:{reps,weight}}  (reps=target total reps, weight=target kg per rep)
     bodyParts: ['胸','背中','脚','腕','肩']
   };
 
@@ -396,29 +402,32 @@
     var list = weekWorkouts(monday);
     var byPart = {};
     list.forEach(function(w){
-      if(!byPart[w.bodyPart]) byPart[w.bodyPart] = {sets:0, weight:0};
-      var sets = Number(w.sets)||0, wt = Number(w.weight)||0;
-      byPart[w.bodyPart].sets += sets;
-      byPart[w.bodyPart].weight += sets*wt;
+      if(!byPart[w.bodyPart]) byPart[w.bodyPart] = {reps:0, weight:0};
+      var sets = Number(w.sets)||0;
+      var repsPerSet = (w.reps===undefined || w.reps===null || w.reps==='') ? 1 : (Number(w.reps)||0);
+      if(repsPerSet<=0) repsPerSet = 1;
+      byPart[w.bodyPart].reps += sets*repsPerSet;
+      byPart[w.bodyPart].weight += entryVolume(w);
     });
     return byPart;
   }
   function goalsForWeek(monday){
     return state.goals[weekKeyFor(monday)] || {};
   }
-  // goals[week][part].weight is the TARGET WEIGHT PER SET (kg).
-  // The target TOTAL weight is always a computed value: sets * weight-per-set.
+  // goals[week][part].weight is the TARGET WEIGHT PER REP (kg).
+  // goals[week][part].reps is the TARGET TOTAL REPS (reps × sets) for the week.
+  // The target TOTAL weight is always a computed value: reps * weight-per-rep.
   function targetTotalWeight(t){
     if(!t) return 0;
-    return (Number(t.sets)||0) * (Number(t.weight)||0);
+    return (Number(t.reps)||0) * (Number(t.weight)||0);
   }
   function isAchieved(target, actual){
     if(!target) return false;
-    var t = target, a = actual || {sets:0,weight:0};
+    var t = target, a = actual || {reps:0,weight:0};
     var tw = targetTotalWeight(t);
-    var setsOk = (t.sets||0) <= 0 || a.sets >= t.sets;
+    var repsOk = (t.reps||0) <= 0 || a.reps >= t.reps;
     var wtOk = tw <= 0 || a.weight >= tw;
-    return setsOk && wtOk && ((t.sets||0)>0 || tw>0);
+    return repsOk && wtOk && ((t.reps||0)>0 || tw>0);
   }
 
   /* ---------- rendering: HOME ---------- */
@@ -426,7 +435,7 @@
     document.getElementById('home-range').textContent = weekRangeLabel(homeWeek);
     var goals = goalsForWeek(homeWeek);
     var actual = actualForWeek(homeWeek);
-    var parts = Object.keys(goals).filter(function(p){ return (goals[p].sets>0 || targetTotalWeight(goals[p])>0); });
+    var parts = Object.keys(goals).filter(function(p){ return (goals[p].reps>0 || targetTotalWeight(goals[p])>0); });
     var body = document.getElementById('home-body');
     var html = '';
 
@@ -438,7 +447,7 @@
     }
 
     if(parts.length===0){
-      html += '<div class="empty">この週の目標がまだありません。<br><a data-goto="goals">目標タブ</a>で部位ごとのセット数・総重量を設定しましょう。</div>';
+      html += '<div class="empty">この週の目標がまだありません。<br><a data-goto="goals">目標タブ</a>で部位ごとの総回数・総重量を設定しましょう。</div>';
       body.innerHTML = html;
       bindGotoLinks(body);
       return;
@@ -446,24 +455,24 @@
 
     var allAchieved = parts.every(function(p){ return isAchieved(goals[p], actual[p]); });
     if(allAchieved){
-      html += '<div class="banner"><div><div class="btitle">🏆 今週の目標を達成しました</div><div class="bsub">全部位でセット数・総重量をクリア</div></div></div>';
+      html += '<div class="banner"><div><div class="btitle">🏆 今週の目標を達成しました</div><div class="bsub">全部位で総回数・総重量をクリア</div></div></div>';
     }
 
     parts.forEach(function(p){
-      var t = goals[p] || {sets:0,weight:0};
-      var a = actual[p] || {sets:0,weight:0};
+      var t = goals[p] || {reps:0,weight:0};
+      var a = actual[p] || {reps:0,weight:0};
       var ach = isAchieved(t,a);
       var tw = targetTotalWeight(t);
-      var setsPct = t.sets>0 ? Math.min(100, Math.round(a.sets/t.sets*100)) : 100;
+      var repsPct = t.reps>0 ? Math.min(100, Math.round(a.reps/t.reps*100)) : 100;
       var wtPct = tw>0 ? Math.min(100, Math.round(a.weight/tw*100)) : 100;
-      var remSets = Math.max(0, t.sets - a.sets);
+      var remReps = Math.max(0, t.reps - a.reps);
       var remWt = Math.max(0, tw - a.weight);
       html += '<div class="part-panel">'+
         '<div class="ph"><span class="pname">'+esc(p)+'</span>'+(ach?'<span class="badge">達成</span>':'')+'</div>';
-      if(t.sets>0){
-        html += '<div class="metric"><div class="mrow"><span>セット数</span><b>'+a.sets+' / '+t.sets+'</b></div>'+
-          '<div class="barbg"><div class="barfill'+(setsPct>=100?' done':'')+'" style="width:'+setsPct+'%"></div></div>'+
-          '<div class="remain">残り <b'+(remSets<=0?' class="done"':'')+'>'+remSets+' セット</b></div></div>';
+      if(t.reps>0){
+        html += '<div class="metric"><div class="mrow"><span>総回数</span><b>'+a.reps+' / '+t.reps+'</b></div>'+
+          '<div class="barbg"><div class="barfill'+(repsPct>=100?' done':'')+'" style="width:'+repsPct+'%"></div></div>'+
+          '<div class="remain">残り <b'+(remReps<=0?' class="done"':'')+'>'+remReps+' 回</b></div></div>';
       }
       if(tw>0){
         html += '<div class="metric"><div class="mrow"><span>総重量</span><b>'+Math.round(a.weight)+' / '+Math.round(tw)+' kg</b></div>'+
@@ -481,6 +490,11 @@
     });
   }
   function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+  function entryVolume(w){
+    var reps = (w.reps===undefined || w.reps===null || w.reps==='') ? 1 : (Number(w.reps)||0);
+    if(reps<=0) reps = 1;
+    return (Number(w.sets)||0)*(Number(w.weight)||0)*reps;
+  }
 
   /* ---------- exercise history helpers ---------- */
   function workoutsForPartSorted(p){
@@ -529,17 +543,18 @@
       listEl.innerHTML = '<div class="empty" style="padding:16px 4px;">この日の記録はまだありません</div>';
     } else {
       listEl.innerHTML = entries.map(function(w){
+        var reps = (w.reps===undefined || w.reps===null || w.reps==='') ? '' : (' × '+w.reps+'回');
         return '<div class="entry">'+
           '<span class="etag">'+esc(w.bodyPart)+'</span>'+
           '<span class="ename">'+esc(w.exercise||'(種目未入力)')+'</span>'+
-          '<span class="eval">'+w.weight+'kg × '+w.sets+'set</span>'+
+          '<span class="eval">'+w.weight+'kg'+reps+' × '+w.sets+'set</span>'+
           '<button class="eedit" data-edit="'+w.id+'">✎</button>'+
           '<button class="edel" data-del="'+w.id+'">×</button>'+
           '</div>';
       }).join('');
     }
     var totalSets = entries.reduce(function(s,w){ return s+(Number(w.sets)||0); },0);
-    var totalWt = entries.reduce(function(s,w){ return s+(Number(w.sets)||0)*(Number(w.weight)||0); },0);
+    var totalWt = entries.reduce(function(s,w){ return s+entryVolume(w); },0);
     document.getElementById('log-total').textContent = 'この日の合計：'+totalSets+' セット / '+Math.round(totalWt)+' kg';
 
     listEl.querySelectorAll('[data-del]').forEach(function(btn){
@@ -559,6 +574,7 @@
         document.getElementById('in-part').value = w.bodyPart;
         document.getElementById('in-exercise').value = w.exercise || '';
         document.getElementById('in-weight').value = w.weight;
+        document.getElementById('in-reps').value = (w.reps===undefined || w.reps===null) ? '' : w.reps;
         document.getElementById('in-sets').value = w.sets;
         document.getElementById('add-entry-btn').textContent = 'この記録を更新する';
         document.getElementById('cancel-edit-btn').style.display = 'block';
@@ -570,6 +586,7 @@
   function cancelEdit(){
     editingId = null;
     document.getElementById('in-weight').value='';
+    document.getElementById('in-reps').value='';
     document.getElementById('in-sets').value='';
     document.getElementById('in-exercise').value = lastExerciseForPart(document.getElementById('in-part').value);
     document.getElementById('add-entry-btn').textContent = 'この日の記録を追加';
@@ -589,23 +606,25 @@
     var part = document.getElementById('in-part').value;
     var exercise = document.getElementById('in-exercise').value.trim();
     var weight = Number(document.getElementById('in-weight').value)||0;
+    var reps = Number(document.getElementById('in-reps').value)||0;
     var sets = Number(document.getElementById('in-sets').value)||0;
     if(!part || sets<=0){ return; }
     if(editingId){
       var w = state.workouts.filter(function(x){ return x.id===editingId; })[0];
       if(w){
-        w.bodyPart = part; w.exercise = exercise; w.weight = weight; w.sets = sets;
+        w.bodyPart = part; w.exercise = exercise; w.weight = weight; w.reps = reps; w.sets = sets;
       }
       cancelEdit();
     } else {
       state.workouts.push({
         id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
-        date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, sets: sets
+        date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, reps: reps, sets: sets
       });
       var dstr = toDateStr(logDate);
       if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
       state.schedule[dstr].actual = true;
       document.getElementById('in-weight').value='';
+      document.getElementById('in-reps').value='';
       document.getElementById('in-sets').value='';
     }
     scheduleSave();
@@ -661,7 +680,7 @@
     var hasLog = dayHasWorkout(dstr);
     var entries = state.workouts.filter(function(w){ return w.date===dstr; });
     var totalSets = entries.reduce(function(s,w){ return s+(Number(w.sets)||0); },0);
-    var totalWt = entries.reduce(function(s,w){ return s+(Number(w.sets)||0)*(Number(w.weight)||0); },0);
+    var totalWt = entries.reduce(function(s,w){ return s+entryVolume(w); },0);
 
     var html = '<div class="daypanel">'+
       '<div class="dph"><span style="font-weight:700;">'+fmtWithDow(dt)+'</span></div>'+
@@ -704,31 +723,31 @@
     var goals = state.goals[wk];
     var listEl = document.getElementById('goal-list');
     var html = state.bodyParts.map(function(p){
-      var g = goals[p] || {sets:0, weight:0};
+      var g = goals[p] || {reps:0, weight:0};
       var tw = targetTotalWeight(g);
       return '<div class="goalrow-wrap">'+
         '<div class="goalrow">'+
         '<span class="gname">'+esc(p)+'</span>'+
-        '<div class="gfield"><label>セット数</label><input type="number" inputmode="numeric" min="0" step="1" data-goal-sets="'+esc(p)+'" value="'+(g.sets||'')+'"></div>'+
+        '<div class="gfield"><label>総回数</label><input type="number" inputmode="numeric" min="0" step="1" data-goal-reps="'+esc(p)+'" value="'+(g.reps||'')+'"></div>'+
         '<div class="gfield"><label>重量kg</label><input type="number" inputmode="decimal" min="0" step="0.5" data-goal-weight="'+esc(p)+'" value="'+(g.weight||'')+'"></div>'+
         '<button class="gdel" data-del-part="'+esc(p)+'">×</button>'+
         '</div>'+
-        '<div class="gtotal">総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.sets>0&&g.weight>0?' （'+g.sets+'セット × '+g.weight+'kg）':'')+'</div>'+
+        '<div class="gtotal">総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.reps>0&&g.weight>0?' （'+g.reps+'回 × '+g.weight+'kg）':'')+'</div>'+
         '</div>';
     }).join('');
     listEl.innerHTML = html || '<div class="empty">部位がありません。下から追加してください。</div>';
 
     function updateRowTotal(p, inp){
       var wrap = inp.closest('.goalrow-wrap');
-      var g = goals[p] || {sets:0,weight:0};
+      var g = goals[p] || {reps:0,weight:0};
       var tw = targetTotalWeight(g);
-      wrap.querySelector('.gtotal').innerHTML = '総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.sets>0&&g.weight>0?' （'+g.sets+'セット × '+g.weight+'kg）':'');
+      wrap.querySelector('.gtotal').innerHTML = '総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.reps>0&&g.weight>0?' （'+g.reps+'回 × '+g.weight+'kg）':'');
     }
-    listEl.querySelectorAll('[data-goal-sets]').forEach(function(inp){
+    listEl.querySelectorAll('[data-goal-reps]').forEach(function(inp){
       inp.addEventListener('input', function(){
-        var p = inp.getAttribute('data-goal-sets');
-        if(!goals[p]) goals[p] = {sets:0, weight:0};
-        goals[p].sets = Number(inp.value)||0;
+        var p = inp.getAttribute('data-goal-reps');
+        if(!goals[p]) goals[p] = {reps:0, weight:0};
+        goals[p].reps = Number(inp.value)||0;
         updateRowTotal(p, inp);
         scheduleSave(); renderHome();
       });
@@ -736,7 +755,7 @@
     listEl.querySelectorAll('[data-goal-weight]').forEach(function(inp){
       inp.addEventListener('input', function(){
         var p = inp.getAttribute('data-goal-weight');
-        if(!goals[p]) goals[p] = {sets:0, weight:0};
+        if(!goals[p]) goals[p] = {reps:0, weight:0};
         goals[p].weight = Number(inp.value)||0;
         updateRowTotal(p, inp);
         scheduleSave(); renderHome();
@@ -778,8 +797,8 @@
     if(state.bodyParts.length===0){ chipsEl.innerHTML=''; return; }
     chipsEl.innerHTML = state.bodyParts.map(function(p){
       var t = curGoals[p];
-      var a = curActual[p] || {sets:0,weight:0};
-      var hasTarget = !!(t && ((t.sets||0)>0 || targetTotalWeight(t)>0));
+      var a = curActual[p] || {reps:0,weight:0};
+      var hasTarget = !!(t && ((t.reps||0)>0 || targetTotalWeight(t)>0));
       var statusClass = hasTarget ? (isAchieved(t,a) ? 'chip-achieved' : 'chip-notachieved') : 'chip-notarget';
       var activeClass = (p===historyPart) ? ' active' : '';
       return '<button data-part="'+esc(p)+'" class="'+statusClass+activeClass+'">'+esc(p)+'</button>';
@@ -797,22 +816,22 @@
     var weeks = [];
     for(var i=7;i>=0;i--){ weeks.push(addDays(realWeekMonday, -7*i)); }
 
-    var setsData=[], setsTarget=[], wtData=[], wtTarget=[];
+    var repsData=[], repsTarget=[], wtData=[], wtTarget=[];
     weeks.forEach(function(mon){
       var g = goalsForWeek(mon), a = actualForWeek(mon);
-      var ap = (historyPart && a[historyPart]) ? a[historyPart] : {sets:0,weight:0};
-      var gp = (historyPart && g[historyPart]) ? g[historyPart] : {sets:0,weight:0};
-      setsData.push(ap.sets);
-      setsTarget.push(gp.sets||0);
+      var ap = (historyPart && a[historyPart]) ? a[historyPart] : {reps:0,weight:0};
+      var gp = (historyPart && g[historyPart]) ? g[historyPart] : {reps:0,weight:0};
+      repsData.push(ap.reps);
+      repsTarget.push(gp.reps||0);
       wtData.push(Math.round(ap.weight));
       wtTarget.push(Math.round(targetTotalWeight(gp)));
     });
 
     var partLabel = historyPart ? esc(historyPart)+' の' : '';
-    document.getElementById('hist-sets-title').textContent = partLabel+'週別セット数（直近8週）';
+    document.getElementById('hist-sets-title').textContent = partLabel+'週別総回数（直近8週）';
     document.getElementById('hist-weight-title').textContent = partLabel+'週別総重量 kg（直近8週）';
 
-    renderBars('hist-sets', weeks, setsData, setsTarget, '');
+    renderBars('hist-sets', weeks, repsData, repsTarget, '');
     renderBars('hist-weight', weeks, wtData, wtTarget, 'kg');
   }
   function renderBars(elId, weeks, data, targets, unit){
