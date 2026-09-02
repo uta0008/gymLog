@@ -102,12 +102,15 @@
   .addbtn{width:100%;background:var(--blue);color:#08202F;border:none;border-radius:8px;padding:11px;
     font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
   .addbtn:active{opacity:.85;}
-  .entry{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
+  .cancelbtn{width:100%;background:none;border:none;color:var(--text-muted);padding:9px;
+    font-size:12px;margin-top:2px;cursor:pointer;font-family:inherit;text-decoration:underline;}
+  .entry{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);}
   .entry:first-child{border-top:none;}
   .entry .etag{font-size:10.5px;color:var(--blue);background:var(--blue-dim);border-radius:5px;padding:2px 6px;flex:none;}
-  .entry .ename{flex:1;font-size:13px;}
-  .entry .eval{font-size:12px;color:var(--text-muted);}
-  .entry .edel{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px 4px;}
+  .entry .ename{flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entry .eval{font-size:12px;color:var(--text-muted);flex:none;}
+  .entry .eedit{background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:2px 4px;flex:none;}
+  .entry .edel{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px 4px;flex:none;}
   .daytotal{font-size:11.5px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
 
   /* calendar */
@@ -156,13 +159,23 @@
     padding:0 16px;font-size:13px;cursor:pointer;font-family:inherit;}
 
   /* history */
+  .part-chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
+  .part-chips button{flex:none;background:var(--surface);border:1.5px solid var(--line);color:var(--text-muted);
+    padding:7px 14px;border-radius:20px;font-size:12.5px;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .part-chips button.chip-achieved{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .part-chips button.chip-notachieved{border-color:var(--danger);color:var(--danger);background:rgba(224,101,79,.14);}
+  .part-chips button.chip-notarget{border-color:var(--line);color:var(--text-muted);background:var(--surface);}
+  .part-chips button.active{border-width:2.5px;font-weight:700;}
   .hist-block{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 10px 8px;margin-bottom:14px;}
   .hist-title{font-size:12px;color:var(--text-muted);margin:0 4px 12px;}
-  .hist-bars{display:flex;align-items:flex-end;gap:6px;height:120px;padding:0 2px;}
+  .hist-bars{display:flex;align-items:flex-end;gap:6px;height:130px;padding:0 2px;}
   .hist-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
-  .hist-val{font-size:9.5px;color:var(--text-muted);margin-bottom:4px;}
-  .hist-bar{width:100%;border-radius:3px 3px 0 0;background:var(--blue);min-height:2px;}
-  .hist-bar.ach{background:var(--accent);}
+  .hist-val{font-size:9.5px;color:var(--text-muted);margin-bottom:4px;text-align:center;}
+  .hist-bar-wrap{width:100%;flex:1;display:flex;align-items:flex-end;position:relative;}
+  .hist-bar{width:100%;border-radius:3px 3px 0 0;background:var(--surface-2);border:1px solid var(--line);min-height:2px;}
+  .hist-bar.below{background:var(--blue);border-color:var(--blue);}
+  .hist-bar.ach{background:var(--accent);border-color:var(--accent);}
+  .hist-target-line{position:absolute;left:-1px;right:-1px;border-top:2px dashed var(--text-muted);}
   .hist-lbl{font-size:9px;color:var(--text-muted);margin-top:6px;white-space:nowrap;}
   .hist-lbl.cur{color:var(--text);font-weight:700;}
 </style>
@@ -219,6 +232,7 @@
           </div>
         </div>
         <button class="addbtn" id="add-entry-btn">この日の記録を追加</button>
+        <button class="cancelbtn" id="cancel-edit-btn" style="display:none;">編集をキャンセル</button>
       </div>
       <div class="card" id="log-list-card">
         <div id="log-list"></div>
@@ -258,13 +272,19 @@
     </section>
 
     <section class="tab" id="tab-history">
+      <div class="part-chips" id="hist-part-chips"></div>
       <div class="hist-block">
-        <p class="hist-title">週別セット数（直近8週）</p>
+        <p class="hist-title" id="hist-sets-title">週別セット数（直近8週）</p>
         <div class="hist-bars" id="hist-sets"></div>
       </div>
       <div class="hist-block">
-        <p class="hist-title">週別総重量 kg（直近8週）</p>
+        <p class="hist-title" id="hist-weight-title">週別総重量 kg（直近8週）</p>
         <div class="hist-bars" id="hist-weight"></div>
+      </div>
+      <div class="legend" style="margin-top:0;flex-wrap:wrap;">
+        <span><i class="lg-actual" style="background:var(--accent);"></i>今週 目標達成</span>
+        <span><i class="lg-actual" style="background:var(--danger);"></i>今週 未達成</span>
+        <span><i class="lg-actual" style="background:var(--surface-2);border:1px solid var(--line);"></i>目標未設定</span>
       </div>
     </section>
   </main>
@@ -480,6 +500,7 @@
           '<span class="etag">'+esc(w.bodyPart)+'</span>'+
           '<span class="ename">'+esc(w.exercise||'(種目未入力)')+'</span>'+
           '<span class="eval">'+w.weight+'kg × '+w.sets+'set</span>'+
+          '<button class="eedit" data-edit="'+w.id+'">✎</button>'+
           '<button class="edel" data-del="'+w.id+'">×</button>'+
           '</div>';
       }).join('');
@@ -491,11 +512,37 @@
     listEl.querySelectorAll('[data-del]').forEach(function(btn){
       btn.addEventListener('click', function(){
         var id = btn.getAttribute('data-del');
+        if(editingId===id) cancelEdit();
         state.workouts = state.workouts.filter(function(w){ return w.id!==id; });
         scheduleSave(); renderLog(); renderAll();
       });
     });
+    listEl.querySelectorAll('[data-edit]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-edit');
+        var w = state.workouts.filter(function(x){ return x.id===id; })[0];
+        if(!w) return;
+        editingId = id;
+        document.getElementById('in-part').value = w.bodyPart;
+        document.getElementById('in-exercise').value = w.exercise || '';
+        document.getElementById('in-weight').value = w.weight;
+        document.getElementById('in-sets').value = w.sets;
+        document.getElementById('add-entry-btn').textContent = 'この記録を更新する';
+        document.getElementById('cancel-edit-btn').style.display = 'block';
+        document.getElementById('in-part').scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
   }
+  var editingId = null;
+  function cancelEdit(){
+    editingId = null;
+    document.getElementById('in-exercise').value='';
+    document.getElementById('in-weight').value='';
+    document.getElementById('in-sets').value='';
+    document.getElementById('add-entry-btn').textContent = 'この日の記録を追加';
+    document.getElementById('cancel-edit-btn').style.display = 'none';
+  }
+  document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
 
   document.getElementById('add-entry-btn').addEventListener('click', function(){
     var part = document.getElementById('in-part').value;
@@ -503,16 +550,24 @@
     var weight = Number(document.getElementById('in-weight').value)||0;
     var sets = Number(document.getElementById('in-sets').value)||0;
     if(!part || sets<=0){ return; }
-    state.workouts.push({
-      id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
-      date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, sets: sets
-    });
-    var dstr = toDateStr(logDate);
-    if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
-    state.schedule[dstr].actual = true;
-    document.getElementById('in-exercise').value='';
-    document.getElementById('in-weight').value='';
-    document.getElementById('in-sets').value='';
+    if(editingId){
+      var w = state.workouts.filter(function(x){ return x.id===editingId; })[0];
+      if(w){
+        w.bodyPart = part; w.exercise = exercise; w.weight = weight; w.sets = sets;
+      }
+      cancelEdit();
+    } else {
+      state.workouts.push({
+        id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
+        date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, sets: sets
+      });
+      var dstr = toDateStr(logDate);
+      if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
+      state.schedule[dstr].actual = true;
+      document.getElementById('in-exercise').value='';
+      document.getElementById('in-weight').value='';
+      document.getElementById('in-sets').value='';
+    }
     scheduleSave();
     renderLog(); renderAll();
   });
@@ -673,37 +728,71 @@
   });
 
   /* ---------- rendering: HISTORY ---------- */
+  var historyPart = null;
+
+  function renderHistoryPartChips(){
+    if(!historyPart || state.bodyParts.indexOf(historyPart)<0) historyPart = state.bodyParts[0] || null;
+    var chipsEl = document.getElementById('hist-part-chips');
+    var curGoals = goalsForWeek(realWeekMonday);
+    var curActual = actualForWeek(realWeekMonday);
+    if(state.bodyParts.length===0){ chipsEl.innerHTML=''; return; }
+    chipsEl.innerHTML = state.bodyParts.map(function(p){
+      var t = curGoals[p];
+      var a = curActual[p] || {sets:0,weight:0};
+      var hasTarget = !!(t && ((t.sets||0)>0 || targetTotalWeight(t)>0));
+      var statusClass = hasTarget ? (isAchieved(t,a) ? 'chip-achieved' : 'chip-notachieved') : 'chip-notarget';
+      var activeClass = (p===historyPart) ? ' active' : '';
+      return '<button data-part="'+esc(p)+'" class="'+statusClass+activeClass+'">'+esc(p)+'</button>';
+    }).join('');
+    chipsEl.querySelectorAll('[data-part]').forEach(function(b){
+      b.addEventListener('click', function(){
+        historyPart = b.getAttribute('data-part');
+        renderHistory();
+      });
+    });
+  }
+
   function renderHistory(){
+    renderHistoryPartChips();
     var weeks = [];
     for(var i=7;i>=0;i--){ weeks.push(addDays(realWeekMonday, -7*i)); }
-    var setsData = weeks.map(function(mon){
-      var a = actualForWeek(mon);
-      var total = 0; Object.keys(a).forEach(function(p){ total += a[p].sets; });
-      return total;
+
+    var setsData=[], setsTarget=[], wtData=[], wtTarget=[];
+    weeks.forEach(function(mon){
+      var g = goalsForWeek(mon), a = actualForWeek(mon);
+      var ap = (historyPart && a[historyPart]) ? a[historyPart] : {sets:0,weight:0};
+      var gp = (historyPart && g[historyPart]) ? g[historyPart] : {sets:0,weight:0};
+      setsData.push(ap.sets);
+      setsTarget.push(gp.sets||0);
+      wtData.push(Math.round(ap.weight));
+      wtTarget.push(Math.round(targetTotalWeight(gp)));
     });
-    var wtData = weeks.map(function(mon){
-      var a = actualForWeek(mon);
-      var total = 0; Object.keys(a).forEach(function(p){ total += a[p].weight; });
-      return Math.round(total);
-    });
-    var achieved = weeks.map(function(mon){
-      var g = goalsForWeek(mon); var a = actualForWeek(mon);
-      var parts = Object.keys(g).filter(function(p){ return (g[p].sets>0||g[p].weight>0); });
-      if(parts.length===0) return false;
-      return parts.every(function(p){ return isAchieved(g[p], a[p]); });
-    });
-    renderBars('hist-sets', weeks, setsData, achieved, '');
-    renderBars('hist-weight', weeks, wtData, achieved, 'kg');
+
+    var partLabel = historyPart ? esc(historyPart)+' の' : '';
+    document.getElementById('hist-sets-title').textContent = partLabel+'週別セット数（直近8週）';
+    document.getElementById('hist-weight-title').textContent = partLabel+'週別総重量 kg（直近8週）';
+
+    renderBars('hist-sets', weeks, setsData, setsTarget, '');
+    renderBars('hist-weight', weeks, wtData, wtTarget, 'kg');
   }
-  function renderBars(elId, weeks, data, achieved, unit){
-    var max = Math.max.apply(null, data.concat([1]));
+  function renderBars(elId, weeks, data, targets, unit){
+    var max = Math.max.apply(null, data.concat(targets).concat([1]));
     var el = document.getElementById(elId);
     var html = weeks.map(function(mon,i){
-      var pct = Math.max(2, Math.round(data[i]/max*100));
+      var val = data[i], tgt = targets[i]||0;
+      var pct = Math.max(2, Math.round(val/max*100));
       var isCur = weekKeyFor(mon)===weekKeyFor(realWeekMonday);
+      var hasTarget = tgt>0;
+      var achieved = hasTarget && val>=tgt;
+      var barClass = hasTarget ? (achieved ? 'ach' : 'below') : '';
+      var markIcon = hasTarget ? (achieved ? '✓' : '') : '';
+      var targetLinePct = hasTarget ? Math.min(100, Math.round(tgt/max*100)) : null;
       return '<div class="hist-col">'+
-        '<span class="hist-val">'+(achieved[i]?'🏆 ':'')+data[i]+'</span>'+
-        '<div class="hist-bar'+(achieved[i]?' ach':'')+'" style="height:'+pct+'%"></div>'+
+        '<span class="hist-val">'+(markIcon?markIcon+' ':'')+val+'</span>'+
+        '<div class="hist-bar-wrap">'+
+          (targetLinePct!==null ? '<div class="hist-target-line" style="bottom:'+targetLinePct+'%"></div>' : '')+
+          '<div class="hist-bar '+barClass+'" style="height:'+pct+'%"></div>'+
+        '</div>'+
         '<span class="hist-lbl'+(isCur?' cur':'')+'">'+fmtShort(mon)+'</span>'+
         '</div>';
     }).join('');
@@ -737,8 +826,8 @@
       var k = b.getAttribute('data-nav');
       if(k==='home-prev'){ homeWeek = addDays(homeWeek,-7); renderHome(); }
       if(k==='home-next'){ homeWeek = addDays(homeWeek,7); renderHome(); }
-      if(k==='log-prev'){ logDate = addDays(logDate,-1); renderLog(); }
-      if(k==='log-next'){ logDate = addDays(logDate,1); renderLog(); }
+      if(k==='log-prev'){ cancelEdit(); logDate = addDays(logDate,-1); renderLog(); }
+      if(k==='log-next'){ cancelEdit(); logDate = addDays(logDate,1); renderLog(); }
       if(k==='cal-prev'){ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1); selectedCalDate=null; renderCalendar(); }
       if(k==='cal-next'){ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1); selectedCalDate=null; renderCalendar(); }
       if(k==='goal-prev'){ goalWeek = addDays(goalWeek,-7); renderGoals(); }
