@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="重量記録">
+<meta name="mobile-web-app-capable" content="yes">
+<title>重量記録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15171B;
+    --surface:#1D2025;
+    --surface-2:#242830;
+    --line:#2C313A;
+    --text:#EDEEF1;
+    --text-muted:#8B919C;
+    --accent:#E8B93F;
+    --accent-dim:#5A4E29;
+    --blue:#4FA3E0;
+    --blue-dim:#22384A;
+    --danger:#E0654F;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);}
+  body{font-family:'Noto Sans JP',sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .num{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-variant-numeric:tabular-nums;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;}
+
+  header{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);
+    padding:14px 18px 12px;display:flex;align-items:center;gap:10px;}
+  header svg{flex:none;}
+  header .htitle{font-weight:900;font-size:17px;letter-spacing:.01em;}
+  header .hsub{font-size:11px;color:var(--text-muted);margin-top:1px;}
+  header .reset-btn{margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:11px;
+    padding:6px 8px;cursor:pointer;}
+
+  main{flex:1;padding:16px 16px 100px;overflow-y:auto;}
+  .tab{display:none;}
+  .tab.active{display:block;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  nav.bottom{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
+    border-top:1px solid var(--line);display:flex;max-width:480px;margin:0 auto;
+    padding-bottom:env(safe-area-inset-bottom);}
+  nav.bottom button{flex:1;background:none;border:none;color:var(--text-muted);padding:9px 2px 7px;
+    display:flex;flex-direction:column;align-items:center;gap:3px;font-family:inherit;font-size:10px;cursor:pointer;}
+  nav.bottom button svg{width:21px;height:21px;stroke:var(--text-muted);fill:none;stroke-width:1.7;}
+  nav.bottom button.active{color:var(--accent);}
+  nav.bottom button.active svg{stroke:var(--accent);}
+
+  /* shared components */
+  .weeknav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .weeknav .range{font-weight:700;font-size:15px;}
+  .weeknav .arrow{background:var(--surface);border:1px solid var(--line);color:var(--text);
+    width:34px;height:34px;border-radius:8px;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .weeknav .arrow:active{background:var(--surface-2);}
+
+  .banner{background:linear-gradient(135deg,var(--accent-dim),var(--surface));border:1px solid var(--accent);
+    border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+  .banner .btitle{font-weight:900;font-size:14px;color:var(--accent);}
+  .banner .bsub{font-size:11px;color:var(--text-muted);margin-top:1px;}
+
+  .daysleft{display:flex;align-items:baseline;gap:6px;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+  .daysleft .n{font-size:30px;color:var(--blue);}
+  .daysleft .lbl{font-size:12px;color:var(--text-muted);}
+
+  .part-panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;}
+  .part-panel .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .part-panel .pname{font-weight:700;font-size:14.5px;}
+  .badge{font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--accent);color:#1A1500;}
+  .metric{margin-bottom:9px;}
+  .metric:last-child{margin-bottom:0;}
+  .metric .mrow{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-muted);margin-bottom:4px;}
+  .metric .mrow b{color:var(--text);font-weight:700;}
+  .barbg{height:7px;border-radius:4px;background:var(--surface-2);overflow:hidden;}
+  .barfill{height:100%;border-radius:4px;background:var(--blue);transition:width .25s ease;}
+  .barfill.done{background:var(--accent);}
+  .remain{font-size:11px;color:var(--text-muted);margin-top:5px;}
+  .remain b{color:var(--blue);font-weight:700;}
+  .remain b.done{color:var(--accent);}
+
+  .empty{text-align:center;color:var(--text-muted);font-size:12.5px;padding:40px 20px;}
+  .empty a{color:var(--blue);text-decoration:underline;cursor:pointer;}
+
+  /* log tab */
+  .daynav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .daynav .dtitle{font-weight:700;font-size:15px;}
+  .daynav .dsub{font-size:11px;color:var(--text-muted);}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:5px;}
+  .field select,.field input{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit;}
+  .field select:focus,.field input:focus{outline:1px solid var(--blue);}
+  .row2{display:flex;gap:10px;}
+  .row2 .field{flex:1;}
+  .addbtn{width:100%;background:var(--blue);color:#08202F;border:none;border-radius:8px;padding:11px;
+    font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;}
+  .addbtn:active{opacity:.85;}
+  .entry{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
+  .entry:first-child{border-top:none;}
+  .entry .etag{font-size:10.5px;color:var(--blue);background:var(--blue-dim);border-radius:5px;padding:2px 6px;flex:none;}
+  .entry .ename{flex:1;font-size:13px;}
+  .entry .eval{font-size:12px;color:var(--text-muted);}
+  .entry .edel{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px 4px;}
+  .daytotal{font-size:11.5px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+
+  /* calendar */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-dow{text-align:center;font-size:10.5px;color:var(--text-muted);padding-bottom:6px;}
+  .cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:8px;background:var(--surface);border:1px solid transparent;cursor:pointer;position:relative;}
+  .cal-cell.blank{background:none;cursor:default;}
+  .cal-cell .cn{font-size:12.5px;}
+  .cal-cell.planned{border-color:var(--blue);}
+  .cal-cell .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);position:absolute;bottom:5px;}
+  .cal-cell.today{background:var(--surface-2);}
+  .cal-cell.today .cn{color:var(--accent);font-weight:700;}
+  .legend{display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--text-muted);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .lg-planned{width:10px;height:10px;border-radius:3px;border:1.5px solid var(--blue);}
+  .lg-actual{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+
+  .daypanel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-top:14px;}
+  .daypanel .dph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .toggles{display:flex;gap:8px;margin-bottom:10px;}
+  .tglbtn{flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--text-muted);font-size:12px;font-family:inherit;cursor:pointer;text-align:center;}
+  .tglbtn.on{border-color:var(--blue);color:var(--blue);background:var(--blue-dim);}
+  .tglbtn.on.actual{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .linkbtn{display:block;text-align:center;color:var(--blue);font-size:12px;text-decoration:underline;margin-top:8px;cursor:pointer;}
+
+  /* goals */
+  .goalrow-wrap{border-top:1px solid var(--line);padding:10px 0;}
+  .goalrow-wrap:first-of-type{border-top:none;}
+  .goalrow{display:flex;align-items:center;gap:8px;}
+  .gtotal{font-size:11px;color:var(--text-muted);margin-top:6px;padding-left:2px;}
+  .gtotal b{color:var(--blue);font-weight:700;}
+  .goalrow .gname{width:64px;font-size:13px;font-weight:700;flex:none;}
+  .goalrow .gfield{flex:1;}
+  .goalrow .gfield label{font-size:9.5px;color:var(--text-muted);display:block;margin-bottom:3px;}
+  .goalrow .gfield input{width:100%;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:7px;padding:7px 8px;font-size:13px;font-family:inherit;}
+  .goalrow .gdel{background:none;border:none;color:var(--text-muted);font-size:15px;cursor:pointer;flex:none;}
+  .copybtn{width:100%;background:none;border:1px dashed var(--line);color:var(--text-muted);border-radius:8px;
+    padding:10px;font-size:12px;margin-bottom:14px;cursor:pointer;font-family:inherit;}
+  .addpart{display:flex;gap:8px;margin-top:12px;}
+  .addpart input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
+  .addpart button{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;
+    padding:0 16px;font-size:13px;cursor:pointer;font-family:inherit;}
+
+  /* history */
+  .hist-block{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 10px 8px;margin-bottom:14px;}
+  .hist-title{font-size:12px;color:var(--text-muted);margin:0 4px 12px;}
+  .hist-bars{display:flex;align-items:flex-end;gap:6px;height:120px;padding:0 2px;}
+  .hist-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+  .hist-val{font-size:9.5px;color:var(--text-muted);margin-bottom:4px;}
+  .hist-bar{width:100%;border-radius:3px 3px 0 0;background:var(--blue);min-height:2px;}
+  .hist-bar.ach{background:var(--accent);}
+  .hist-lbl{font-size:9px;color:var(--text-muted);margin-top:6px;white-space:nowrap;}
+  .hist-lbl.cur{color:var(--text);font-weight:700;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <svg width="24" height="24" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="1.8" fill="none" stroke-linecap="round">
+      <circle cx="5" cy="12" r="2.6"/><circle cx="19" cy="12" r="2.6"/><line x1="7.6" y1="12" x2="16.4" y2="12"/>
+    </svg>
+    <div>
+      <div class="htitle">重量記録</div>
+      <div class="hsub" id="header-sub"></div>
+    </div>
+    <button class="reset-btn" id="reset-btn">初期化</button>
+  </header>
+
+  <main>
+    <section class="tab" id="tab-home">
+      <div class="weeknav">
+        <button class="arrow" data-nav="home-prev">‹</button>
+        <div class="range" id="home-range"></div>
+        <button class="arrow" data-nav="home-next">›</button>
+      </div>
+      <div id="home-body"></div>
+    </section>
+
+    <section class="tab" id="tab-log">
+      <div class="daynav">
+        <button class="arrow" data-nav="log-prev">‹</button>
+        <div style="text-align:center;">
+          <div class="dtitle" id="log-date-title"></div>
+          <div class="dsub" id="log-date-sub"></div>
+        </div>
+        <button class="arrow" data-nav="log-next">›</button>
+      </div>
+      <div class="card">
+        <div class="field">
+          <label>部位</label>
+          <select id="in-part"></select>
+        </div>
+        <div class="field">
+          <label>種目</label>
+          <input id="in-exercise" type="text" placeholder="例：ベンチプレス">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>重量 (kg)</label>
+            <input id="in-weight" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">
+          </div>
+          <div class="field">
+            <label>セット数</label>
+            <input id="in-sets" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
+          </div>
+        </div>
+        <button class="addbtn" id="add-entry-btn">この日の記録を追加</button>
+      </div>
+      <div class="card" id="log-list-card">
+        <div id="log-list"></div>
+        <div class="daytotal" id="log-total"></div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-calendar">
+      <div class="weeknav">
+        <button class="arrow" data-nav="cal-prev">‹</button>
+        <div class="range" id="cal-month"></div>
+        <button class="arrow" data-nav="cal-next">›</button>
+      </div>
+      <div class="cal-grid" id="cal-dows"></div>
+      <div class="cal-grid" id="cal-grid" style="margin-top:4px;"></div>
+      <div class="legend">
+        <span><i class="lg-planned"></i>予定日</span>
+        <span><i class="lg-actual"></i>実施日</span>
+      </div>
+      <div id="cal-day-panel"></div>
+    </section>
+
+    <section class="tab" id="tab-goals">
+      <div class="weeknav">
+        <button class="arrow" data-nav="goal-prev">‹</button>
+        <div class="range" id="goal-range"></div>
+        <button class="arrow" data-nav="goal-next">›</button>
+      </div>
+      <button class="copybtn" id="copy-prev-btn">先週の目標をコピー</button>
+      <div class="card">
+        <div id="goal-list"></div>
+        <div class="addpart">
+          <input id="in-new-part" type="text" placeholder="部位を追加（例：前腕）">
+          <button id="add-part-btn">追加</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-history">
+      <div class="hist-block">
+        <p class="hist-title">週別セット数（直近8週）</p>
+        <div class="hist-bars" id="hist-sets"></div>
+      </div>
+      <div class="hist-block">
+        <p class="hist-title">週別総重量 kg（直近8週）</p>
+        <div class="hist-bars" id="hist-weight"></div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom">
+    <button data-tab="home" class="active">
+      <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"/><path d="M6 10v9h5v-5h2v5h5v-9"/></svg>
+      ホーム
+    </button>
+    <button data-tab="log">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M12 8v8M8 12h8"/></svg>
+      記録
+    </button>
+    <button data-tab="calendar">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>
+      カレンダー
+    </button>
+    <button data-tab="goals">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.2"/></svg>
+      目標
+    </button>
+    <button data-tab="history">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+      履歴
+    </button>
+  </nav>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- date helpers ---------- */
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function toDateStr(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  function parseDateStr(s){ var p=s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
+  function getMonday(d){ var date=new Date(d.getFullYear(),d.getMonth(),d.getDate()); var day=date.getDay();
+    var diff=(day===0?-6:1-day); date.setDate(date.getDate()+diff); return date; }
+  function addDays(d,n){ var nd=new Date(d.getFullYear(),d.getMonth(),d.getDate()); nd.setDate(nd.getDate()+n); return nd; }
+  function weekKeyFor(d){ return toDateStr(getMonday(d)); }
+  var DOW=['月','火','水','木','金','土','日'];
+  function fmtShort(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+  function fmtWithDow(d){ var w=d.getDay(); var idx=(w===0?6:w-1); return (d.getMonth()+1)+'/'+d.getDate()+' ('+DOW[idx]+')'; }
+  function weekRangeLabel(monday){ var sun=addDays(monday,6); return fmtShort(monday)+' 〜 '+fmtShort(sun); }
+  function sameDate(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  var today = new Date();
+  var todayStr = toDateStr(today);
+  var realWeekMonday = getMonday(today);
+
+  /* ---------- state ---------- */
+  var state = {
+    workouts: [],   // {id,date,bodyPart,exercise,weight,sets}
+    schedule: {},   // dateStr -> {planned:bool, actual:bool}
+    goals: {},      // weekKey -> {bodyPart:{sets,weight}}
+    bodyParts: ['胸','背中','脚','腕','肩']
+  };
+
+  var STORAGE_KEY = 'gymlog-state-v1';
+  var storageOK = true;
+  function doSave(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){
+      console.error('save error', e);
+      storageOK = false;
+    }
+  }
+  function scheduleSave(){ doSave(); }
+  function loadState(cb){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var parsed = JSON.parse(raw);
+        state.workouts = parsed.workouts || [];
+        state.schedule = parsed.schedule || {};
+        state.goals = parsed.goals || {};
+        state.bodyParts = (parsed.bodyParts && parsed.bodyParts.length) ? parsed.bodyParts : state.bodyParts;
+      }
+    }catch(e){
+      console.log('no existing data or read error', e);
+      storageOK = false;
+    }
+    cb();
+    if(!storageOK){
+      var sub = document.getElementById('header-sub');
+      if(sub) sub.textContent = '⚠ この端末では保存できません（プライベートブラウズ中など）';
+    }
+  }
+
+  /* ---------- nav state ---------- */
+  var homeWeek = getMonday(today);
+  var goalWeek = getMonday(today);
+  var logDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  var calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  var selectedCalDate = null;
+  var activeTab = 'home';
+
+  /* ---------- computation ---------- */
+  function weekWorkouts(monday){
+    var start = monday, end = addDays(monday,6);
+    return state.workouts.filter(function(w){
+      var d = parseDateStr(w.date);
+      return d>=start && d<=end;
+    });
+  }
+  function actualForWeek(monday){
+    var list = weekWorkouts(monday);
+    var byPart = {};
+    list.forEach(function(w){
+      if(!byPart[w.bodyPart]) byPart[w.bodyPart] = {sets:0, weight:0};
+      var sets = Number(w.sets)||0, wt = Number(w.weight)||0;
+      byPart[w.bodyPart].sets += sets;
+      byPart[w.bodyPart].weight += sets*wt;
+    });
+    return byPart;
+  }
+  function goalsForWeek(monday){
+    return state.goals[weekKeyFor(monday)] || {};
+  }
+  // goals[week][part].weight is the TARGET WEIGHT PER SET (kg).
+  // The target TOTAL weight is always a computed value: sets * weight-per-set.
+  function targetTotalWeight(t){
+    if(!t) return 0;
+    return (Number(t.sets)||0) * (Number(t.weight)||0);
+  }
+  function isAchieved(target, actual){
+    if(!target) return false;
+    var t = target, a = actual || {sets:0,weight:0};
+    var tw = targetTotalWeight(t);
+    var setsOk = (t.sets||0) <= 0 || a.sets >= t.sets;
+    var wtOk = tw <= 0 || a.weight >= tw;
+    return setsOk && wtOk && ((t.sets||0)>0 || tw>0);
+  }
+
+  /* ---------- rendering: HOME ---------- */
+  function renderHome(){
+    document.getElementById('home-range').textContent = weekRangeLabel(homeWeek);
+    var goals = goalsForWeek(homeWeek);
+    var actual = actualForWeek(homeWeek);
+    var parts = Object.keys(goals).filter(function(p){ return (goals[p].sets>0 || targetTotalWeight(goals[p])>0); });
+    var body = document.getElementById('home-body');
+    var html = '';
+
+    var isCurrent = weekKeyFor(homeWeek) === weekKeyFor(realWeekMonday);
+    if(isCurrent){
+      var dayIdx = (today.getDay()===0?6:today.getDay()-1); // 0=mon
+      var remainDays = 7 - dayIdx;
+      html += '<div class="daysleft"><span class="n num">'+remainDays+'</span><span class="lbl">日 — 今週の残り日数</span></div>';
+    }
+
+    if(parts.length===0){
+      html += '<div class="empty">この週の目標がまだありません。<br><a data-goto="goals">目標タブ</a>で部位ごとのセット数・総重量を設定しましょう。</div>';
+      body.innerHTML = html;
+      bindGotoLinks(body);
+      return;
+    }
+
+    var allAchieved = parts.every(function(p){ return isAchieved(goals[p], actual[p]); });
+    if(allAchieved){
+      html += '<div class="banner"><div><div class="btitle">🏆 今週の目標を達成しました</div><div class="bsub">全部位でセット数・総重量をクリア</div></div></div>';
+    }
+
+    parts.forEach(function(p){
+      var t = goals[p] || {sets:0,weight:0};
+      var a = actual[p] || {sets:0,weight:0};
+      var ach = isAchieved(t,a);
+      var tw = targetTotalWeight(t);
+      var setsPct = t.sets>0 ? Math.min(100, Math.round(a.sets/t.sets*100)) : 100;
+      var wtPct = tw>0 ? Math.min(100, Math.round(a.weight/tw*100)) : 100;
+      var remSets = Math.max(0, t.sets - a.sets);
+      var remWt = Math.max(0, tw - a.weight);
+      html += '<div class="part-panel">'+
+        '<div class="ph"><span class="pname">'+esc(p)+'</span>'+(ach?'<span class="badge">達成</span>':'')+'</div>';
+      if(t.sets>0){
+        html += '<div class="metric"><div class="mrow"><span>セット数</span><b>'+a.sets+' / '+t.sets+'</b></div>'+
+          '<div class="barbg"><div class="barfill'+(setsPct>=100?' done':'')+'" style="width:'+setsPct+'%"></div></div>'+
+          '<div class="remain">残り <b'+(remSets<=0?' class="done"':'')+'>'+remSets+' セット</b></div></div>';
+      }
+      if(tw>0){
+        html += '<div class="metric"><div class="mrow"><span>総重量</span><b>'+Math.round(a.weight)+' / '+Math.round(tw)+' kg</b></div>'+
+          '<div class="barbg"><div class="barfill'+(wtPct>=100?' done':'')+'" style="width:'+wtPct+'%"></div></div>'+
+          '<div class="remain">残り <b'+(remWt<=0?' class="done"':'')+'>'+Math.round(remWt)+' kg</b></div></div>';
+      }
+      html += '</div>';
+    });
+    body.innerHTML = html;
+    bindGotoLinks(body);
+  }
+  function bindGotoLinks(scope){
+    scope.querySelectorAll('[data-goto]').forEach(function(el){
+      el.addEventListener('click', function(){ switchTab(el.getAttribute('data-goto')); });
+    });
+  }
+  function esc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+  /* ---------- rendering: LOG ---------- */
+  function renderLog(){
+    var dstr = toDateStr(logDate);
+    document.getElementById('log-date-title').textContent = fmtWithDow(logDate);
+    document.getElementById('log-date-sub').textContent = (dstr===todayStr) ? '今日' : '';
+
+    var sel = document.getElementById('in-part');
+    sel.innerHTML = state.bodyParts.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
+
+    var entries = state.workouts.filter(function(w){ return w.date===dstr; });
+    var listEl = document.getElementById('log-list');
+    if(entries.length===0){
+      listEl.innerHTML = '<div class="empty" style="padding:16px 4px;">この日の記録はまだありません</div>';
+    } else {
+      listEl.innerHTML = entries.map(function(w){
+        return '<div class="entry">'+
+          '<span class="etag">'+esc(w.bodyPart)+'</span>'+
+          '<span class="ename">'+esc(w.exercise||'(種目未入力)')+'</span>'+
+          '<span class="eval">'+w.weight+'kg × '+w.sets+'set</span>'+
+          '<button class="edel" data-del="'+w.id+'">×</button>'+
+          '</div>';
+      }).join('');
+    }
+    var totalSets = entries.reduce(function(s,w){ return s+(Number(w.sets)||0); },0);
+    var totalWt = entries.reduce(function(s,w){ return s+(Number(w.sets)||0)*(Number(w.weight)||0); },0);
+    document.getElementById('log-total').textContent = 'この日の合計：'+totalSets+' セット / '+Math.round(totalWt)+' kg';
+
+    listEl.querySelectorAll('[data-del]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-del');
+        state.workouts = state.workouts.filter(function(w){ return w.id!==id; });
+        scheduleSave(); renderLog(); renderAll();
+      });
+    });
+  }
+
+  document.getElementById('add-entry-btn').addEventListener('click', function(){
+    var part = document.getElementById('in-part').value;
+    var exercise = document.getElementById('in-exercise').value.trim();
+    var weight = Number(document.getElementById('in-weight').value)||0;
+    var sets = Number(document.getElementById('in-sets').value)||0;
+    if(!part || sets<=0){ return; }
+    state.workouts.push({
+      id: 'w'+Date.now()+Math.random().toString(36).slice(2,7),
+      date: toDateStr(logDate), bodyPart: part, exercise: exercise, weight: weight, sets: sets
+    });
+    var dstr = toDateStr(logDate);
+    if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
+    state.schedule[dstr].actual = true;
+    document.getElementById('in-exercise').value='';
+    document.getElementById('in-weight').value='';
+    document.getElementById('in-sets').value='';
+    scheduleSave();
+    renderLog(); renderAll();
+  });
+
+  /* ---------- rendering: CALENDAR ---------- */
+  var MONTH_NAMES=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  function dayHasWorkout(dstr){ return state.workouts.some(function(w){ return w.date===dstr; }); }
+  function isActual(dstr){
+    var s = state.schedule[dstr];
+    return (s && s.actual) || dayHasWorkout(dstr);
+  }
+  function isPlanned(dstr){
+    var s = state.schedule[dstr];
+    return !!(s && s.planned);
+  }
+  function renderCalendar(){
+    document.getElementById('cal-month').textContent = calMonth.getFullYear()+'年 '+MONTH_NAMES[calMonth.getMonth()];
+    var dowEl = document.getElementById('cal-dows');
+    dowEl.innerHTML = DOW.map(function(d){ return '<div class="cal-dow">'+d+'</div>'; }).join('');
+
+    var first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+    var startOffset = (first.getDay()===0?6:first.getDay()-1);
+    var daysInMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 0).getDate();
+    var grid = document.getElementById('cal-grid');
+    var html='';
+    for(var i=0;i<startOffset;i++){ html += '<div class="cal-cell blank"></div>'; }
+    for(var d=1; d<=daysInMonth; d++){
+      var dt = new Date(calMonth.getFullYear(), calMonth.getMonth(), d);
+      var dstr = toDateStr(dt);
+      var cls='cal-cell';
+      if(isPlanned(dstr)) cls+=' planned';
+      if(sameDate(dt, today)) cls+=' today';
+      html += '<div class="'+cls+'" data-date="'+dstr+'"><span class="cn">'+d+'</span>'+(isActual(dstr)?'<span class="dot"></span>':'')+'</div>';
+    }
+    grid.innerHTML = html;
+    grid.querySelectorAll('[data-date]').forEach(function(cell){
+      cell.addEventListener('click', function(){
+        selectedCalDate = cell.getAttribute('data-date');
+        renderCalDayPanel();
+      });
+    });
+    renderCalDayPanel();
+  }
+  function renderCalDayPanel(){
+    var panel = document.getElementById('cal-day-panel');
+    if(!selectedCalDate){ panel.innerHTML=''; return; }
+    var dstr = selectedCalDate;
+    var dt = parseDateStr(dstr);
+    var planned = isPlanned(dstr);
+    var actualManual = state.schedule[dstr] && state.schedule[dstr].actual;
+    var hasLog = dayHasWorkout(dstr);
+    var entries = state.workouts.filter(function(w){ return w.date===dstr; });
+    var totalSets = entries.reduce(function(s,w){ return s+(Number(w.sets)||0); },0);
+    var totalWt = entries.reduce(function(s,w){ return s+(Number(w.sets)||0)*(Number(w.weight)||0); },0);
+
+    var html = '<div class="daypanel">'+
+      '<div class="dph"><span style="font-weight:700;">'+fmtWithDow(dt)+'</span></div>'+
+      '<div class="toggles">'+
+        '<button class="tglbtn'+(planned?' on':'')+'" data-tgl="planned">予定日'+(planned?' ✓':'')+'</button>'+
+        '<button class="tglbtn'+(actualManual?' on actual':'')+'" data-tgl="actual">実施日'+(actualManual?' ✓':'')+'</button>'+
+      '</div>';
+    if(entries.length>0){
+      html += '<div style="font-size:12px;color:var(--text-muted);">記録：'+totalSets+' セット / '+Math.round(totalWt)+' kg（'+entries.length+'件）</div>';
+    } else {
+      html += '<div style="font-size:12px;color:var(--text-muted);">この日の記録はまだありません</div>';
+    }
+    html += '<span class="linkbtn" data-goto-log="'+dstr+'">記録タブでこの日を編集 →</span>'+
+      '</div>';
+    panel.innerHTML = html;
+
+    panel.querySelectorAll('[data-tgl]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var key = btn.getAttribute('data-tgl');
+        if(!state.schedule[dstr]) state.schedule[dstr] = {planned:false, actual:false};
+        state.schedule[dstr][key] = !state.schedule[dstr][key];
+        scheduleSave();
+        renderCalendar();
+      });
+    });
+    var goEl = panel.querySelector('[data-goto-log]');
+    if(goEl){
+      goEl.addEventListener('click', function(){
+        logDate = parseDateStr(goEl.getAttribute('data-goto-log'));
+        switchTab('log');
+      });
+    }
+  }
+
+  /* ---------- rendering: GOALS ---------- */
+  function renderGoals(){
+    document.getElementById('goal-range').textContent = weekRangeLabel(goalWeek);
+    var wk = weekKeyFor(goalWeek);
+    if(!state.goals[wk]) state.goals[wk] = {};
+    var goals = state.goals[wk];
+    var listEl = document.getElementById('goal-list');
+    var html = state.bodyParts.map(function(p){
+      var g = goals[p] || {sets:0, weight:0};
+      var tw = targetTotalWeight(g);
+      return '<div class="goalrow-wrap">'+
+        '<div class="goalrow">'+
+        '<span class="gname">'+esc(p)+'</span>'+
+        '<div class="gfield"><label>セット数</label><input type="number" inputmode="numeric" min="0" step="1" data-goal-sets="'+esc(p)+'" value="'+(g.sets||'')+'"></div>'+
+        '<div class="gfield"><label>重量kg</label><input type="number" inputmode="decimal" min="0" step="0.5" data-goal-weight="'+esc(p)+'" value="'+(g.weight||'')+'"></div>'+
+        '<button class="gdel" data-del-part="'+esc(p)+'">×</button>'+
+        '</div>'+
+        '<div class="gtotal">総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.sets>0&&g.weight>0?' （'+g.sets+'セット × '+g.weight+'kg）':'')+'</div>'+
+        '</div>';
+    }).join('');
+    listEl.innerHTML = html || '<div class="empty">部位がありません。下から追加してください。</div>';
+
+    function updateRowTotal(p, inp){
+      var wrap = inp.closest('.goalrow-wrap');
+      var g = goals[p] || {sets:0,weight:0};
+      var tw = targetTotalWeight(g);
+      wrap.querySelector('.gtotal').innerHTML = '総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.sets>0&&g.weight>0?' （'+g.sets+'セット × '+g.weight+'kg）':'');
+    }
+    listEl.querySelectorAll('[data-goal-sets]').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var p = inp.getAttribute('data-goal-sets');
+        if(!goals[p]) goals[p] = {sets:0, weight:0};
+        goals[p].sets = Number(inp.value)||0;
+        updateRowTotal(p, inp);
+        scheduleSave(); renderHome();
+      });
+    });
+    listEl.querySelectorAll('[data-goal-weight]').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var p = inp.getAttribute('data-goal-weight');
+        if(!goals[p]) goals[p] = {sets:0, weight:0};
+        goals[p].weight = Number(inp.value)||0;
+        updateRowTotal(p, inp);
+        scheduleSave(); renderHome();
+      });
+    });
+    listEl.querySelectorAll('[data-del-part]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var p = btn.getAttribute('data-del-part');
+        if(!confirm(p+'を部位一覧から削除しますか？（過去の記録は残ります）')) return;
+        state.bodyParts = state.bodyParts.filter(function(x){ return x!==p; });
+        scheduleSave(); renderGoals(); renderHome(); renderLog();
+      });
+    });
+  }
+  document.getElementById('copy-prev-btn').addEventListener('click', function(){
+    var prevWk = weekKeyFor(addDays(goalWeek, -7));
+    var curWk = weekKeyFor(goalWeek);
+    if(!state.goals[prevWk]){ alert('先週の目標が見つかりません'); return; }
+    state.goals[curWk] = JSON.parse(JSON.stringify(state.goals[prevWk]));
+    scheduleSave(); renderGoals(); renderHome();
+  });
+  document.getElementById('add-part-btn').addEventListener('click', function(){
+    var inp = document.getElementById('in-new-part');
+    var v = inp.value.trim();
+    if(!v || state.bodyParts.indexOf(v)>=0) return;
+    state.bodyParts.push(v);
+    inp.value='';
+    scheduleSave(); renderGoals(); renderLog();
+  });
+
+  /* ---------- rendering: HISTORY ---------- */
+  function renderHistory(){
+    var weeks = [];
+    for(var i=7;i>=0;i--){ weeks.push(addDays(realWeekMonday, -7*i)); }
+    var setsData = weeks.map(function(mon){
+      var a = actualForWeek(mon);
+      var total = 0; Object.keys(a).forEach(function(p){ total += a[p].sets; });
+      return total;
+    });
+    var wtData = weeks.map(function(mon){
+      var a = actualForWeek(mon);
+      var total = 0; Object.keys(a).forEach(function(p){ total += a[p].weight; });
+      return Math.round(total);
+    });
+    var achieved = weeks.map(function(mon){
+      var g = goalsForWeek(mon); var a = actualForWeek(mon);
+      var parts = Object.keys(g).filter(function(p){ return (g[p].sets>0||g[p].weight>0); });
+      if(parts.length===0) return false;
+      return parts.every(function(p){ return isAchieved(g[p], a[p]); });
+    });
+    renderBars('hist-sets', weeks, setsData, achieved, '');
+    renderBars('hist-weight', weeks, wtData, achieved, 'kg');
+  }
+  function renderBars(elId, weeks, data, achieved, unit){
+    var max = Math.max.apply(null, data.concat([1]));
+    var el = document.getElementById(elId);
+    var html = weeks.map(function(mon,i){
+      var pct = Math.max(2, Math.round(data[i]/max*100));
+      var isCur = weekKeyFor(mon)===weekKeyFor(realWeekMonday);
+      return '<div class="hist-col">'+
+        '<span class="hist-val">'+(achieved[i]?'🏆 ':'')+data[i]+'</span>'+
+        '<div class="hist-bar'+(achieved[i]?' ach':'')+'" style="height:'+pct+'%"></div>'+
+        '<span class="hist-lbl'+(isCur?' cur':'')+'">'+fmtShort(mon)+'</span>'+
+        '</div>';
+    }).join('');
+    el.innerHTML = html;
+  }
+
+  /* ---------- global render / nav ---------- */
+  function renderAll(){
+    renderHome(); renderLog(); renderCalendar(); renderGoals(); renderHistory();
+  }
+  function switchTab(name){
+    activeTab = name;
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.getElementById('tab-'+name).classList.add('active');
+    document.querySelectorAll('nav.bottom button').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-tab')===name);
+    });
+    updateHeaderSub();
+  }
+  function updateHeaderSub(){
+    var sub = document.getElementById('header-sub');
+    if(!storageOK){ sub.textContent = '⚠ この端末では保存できません（プライベートブラウズ中など）'; return; }
+    var labels = {home:'今週の進捗', log:'日別の記録入力', calendar:'予定と実施の記録', goals:'週間目標の設定', history:'8週間の履歴'};
+    sub.textContent = labels[activeTab] || '';
+  }
+  document.querySelectorAll('nav.bottom button').forEach(function(b){
+    b.addEventListener('click', function(){ switchTab(b.getAttribute('data-tab')); });
+  });
+  document.querySelectorAll('[data-nav]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var k = b.getAttribute('data-nav');
+      if(k==='home-prev'){ homeWeek = addDays(homeWeek,-7); renderHome(); }
+      if(k==='home-next'){ homeWeek = addDays(homeWeek,7); renderHome(); }
+      if(k==='log-prev'){ logDate = addDays(logDate,-1); renderLog(); }
+      if(k==='log-next'){ logDate = addDays(logDate,1); renderLog(); }
+      if(k==='cal-prev'){ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()-1, 1); selectedCalDate=null; renderCalendar(); }
+      if(k==='cal-next'){ calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 1); selectedCalDate=null; renderCalendar(); }
+      if(k==='goal-prev'){ goalWeek = addDays(goalWeek,-7); renderGoals(); }
+      if(k==='goal-next'){ goalWeek = addDays(goalWeek,7); renderGoals(); }
+    });
+  });
+  document.getElementById('reset-btn').addEventListener('click', function(){
+    if(!confirm('すべての記録・目標・カレンダー登録を削除します。よろしいですか？')) return;
+    state = { workouts:[], schedule:{}, goals:{}, bodyParts:['胸','背中','脚','腕','肩'] };
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    scheduleSave(); renderAll();
+  });
+
+  /* ---------- init ---------- */
+  loadState(function(){
+    renderAll();
+    switchTab('home');
+  });
+})();
+</script>
+</body>
+</html>
