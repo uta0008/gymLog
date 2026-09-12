@@ -116,13 +116,29 @@
   .addbtn:active{opacity:.85;}
   .cancelbtn{width:100%;background:none;border:none;color:var(--text-muted);padding:9px;
     font-size:12px;margin-top:2px;cursor:pointer;font-family:inherit;text-decoration:underline;}
-  .entry{display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);}
+  .entry{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);}
   .entry:first-child{border-top:none;}
   .entry .etag{font-size:10.5px;color:var(--blue);background:var(--blue-dim);border-radius:5px;padding:2px 6px;flex:none;}
   .entry .ename{flex:1;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .entry .eval{font-size:12px;color:var(--text-muted);flex:none;}
+  .entry .eval{flex:1;font-size:13px;color:var(--text);}
   .entry .eedit{background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:2px 4px;flex:none;}
   .entry .edel{background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px 4px;flex:none;}
+  .loggrp-part{margin-bottom:16px;}
+  .loggrp-part:last-child{margin-bottom:0;}
+  .loggrp-part-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;cursor:pointer;
+    padding:4px 2px;}
+  .loggrp-part-h .pname{font-weight:700;font-size:14px;}
+  .loggrp-part-h .phright{display:flex;align-items:center;gap:8px;}
+  .loggrp-part-h .grp-count{font-size:10.5px;color:var(--text-muted);background:var(--surface-2);
+    border-radius:10px;padding:2px 8px;}
+  .loggrp-part-h .chev{font-size:11px;color:var(--text-muted);width:12px;text-align:center;}
+  .grp-remain{font-size:11px;color:var(--blue);margin-bottom:8px;padding:0 2px;}
+  .grp-remain.done{color:var(--accent);}
+  .loggrp-body{padding-top:2px;}
+  .loggrp-ex{margin-bottom:6px;padding-left:4px;border-left:2px solid var(--line);}
+  .loggrp-ex:last-child{margin-bottom:0;}
+  .loggrp-ex-h{font-size:11.5px;color:var(--text-muted);font-weight:700;margin:4px 0 2px 8px;}
+  .loggrp-ex .entry{padding-left:8px;}
   .daytotal{font-size:11.5px;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
 
   /* calendar */
@@ -522,6 +538,7 @@
   }
 
   /* ---------- rendering: LOG ---------- */
+  var logExpandedParts = {};
   function renderLog(){
     var dstr = toDateStr(logDate);
     document.getElementById('log-date-title').textContent = fmtWithDow(logDate);
@@ -544,17 +561,64 @@
     if(entries.length===0){
       listEl.innerHTML = '<div class="empty" style="padding:16px 4px;">この日の記録はまだありません</div>';
     } else {
-      listEl.innerHTML = entries.map(function(w){
-        var reps = (w.reps===undefined || w.reps===null || w.reps==='') ? '' : (' × '+w.reps+'回');
-        var setsSuffix = (Number(w.sets)>1) ? (' × '+w.sets+'set') : '';
-        return '<div class="entry">'+
-          '<span class="etag">'+esc(w.bodyPart)+'</span>'+
-          '<span class="ename">'+esc(w.exercise||'(種目未入力)')+'</span>'+
-          '<span class="eval">'+w.weight+'kg'+reps+setsSuffix+'</span>'+
-          '<button class="eedit" data-edit="'+w.id+'">✎</button>'+
-          '<button class="edel" data-del="'+w.id+'">×</button>'+
+      var partsOrder = state.bodyParts.slice();
+      entries.forEach(function(w){ if(partsOrder.indexOf(w.bodyPart)<0) partsOrder.push(w.bodyPart); });
+      var weekMonday = getMonday(logDate);
+      var goals = goalsForWeek(weekMonday);
+      var actualWk = actualForWeek(weekMonday);
+      var html = '';
+      partsOrder.forEach(function(p){
+        var partEntries = entries.filter(function(w){ return w.bodyPart===p; });
+        if(partEntries.length===0) return;
+        var t = goals[p];
+        var a = actualWk[p] || {reps:0, weight:0};
+        var remainHtml = '';
+        if(t && ((t.reps||0)>0 || targetTotalWeight(t)>0)){
+          if(isAchieved(t,a)){
+            remainHtml = '<div class="grp-remain done">🏆 今週の目標を達成済み</div>';
+          } else {
+            var tw = targetTotalWeight(t);
+            var parts = [];
+            if(tw>0) parts.push('残り '+Math.round(Math.max(0, tw-a.weight))+'kg');
+            if(t.reps>0) parts.push('残り '+Math.max(0, t.reps-a.reps)+'回');
+            remainHtml = '<div class="grp-remain">目標まで '+parts.join(' ・ ')+'</div>';
+          }
+        }
+        var isOpen = !!logExpandedParts[p];
+        var setCount = partEntries.length;
+        var innerHtml = remainHtml;
+        var exOrder = [];
+        partEntries.forEach(function(w){ if(exOrder.indexOf(w.exercise)<0) exOrder.push(w.exercise); });
+        exOrder.forEach(function(ex){
+          var exEntries = partEntries.filter(function(w){ return w.exercise===ex; });
+          innerHtml += '<div class="loggrp-ex"><div class="loggrp-ex-h">'+esc(ex||'(種目未入力)')+'</div>';
+          exEntries.forEach(function(w){
+            var reps = (w.reps===undefined || w.reps===null || w.reps==='') ? '' : (' × '+w.reps+'回');
+            var setsSuffix = (Number(w.sets)>1) ? (' × '+w.sets+'set') : '';
+            innerHtml += '<div class="entry">'+
+              '<span class="eval">'+w.weight+'kg'+reps+setsSuffix+'</span>'+
+              '<button class="eedit" data-edit="'+w.id+'">✎</button>'+
+              '<button class="edel" data-del="'+w.id+'">×</button>'+
+              '</div>';
+          });
+          innerHtml += '</div>';
+        });
+        html += '<div class="loggrp-part">'+
+          '<div class="loggrp-part-h" data-toggle-part="'+esc(p)+'">'+
+            '<span class="pname">'+esc(p)+'</span>'+
+            '<span class="phright"><span class="grp-count">'+setCount+'set</span><span class="chev">'+(isOpen?'▾':'▸')+'</span></span>'+
+          '</div>'+
+          '<div class="loggrp-body" style="display:'+(isOpen?'block':'none')+';">'+innerHtml+'</div>'+
           '</div>';
-      }).join('');
+      });
+      listEl.innerHTML = html;
+      listEl.querySelectorAll('[data-toggle-part]').forEach(function(h){
+        h.addEventListener('click', function(){
+          var p = h.getAttribute('data-toggle-part');
+          logExpandedParts[p] = !logExpandedParts[p];
+          renderLog();
+        });
+      });
     }
     var totalSets = entries.reduce(function(s,w){ return s+(Number(w.sets)||0); },0);
     var totalWt = entries.reduce(function(s,w){ return s+entryVolume(w); },0);
@@ -614,7 +678,8 @@
     document.getElementById('add-row-btn').style.display = editing ? 'none' : 'block';
   }
   document.getElementById('add-row-btn').addEventListener('click', function(){
-    entryRows.push({weight:'', reps:''});
+    var lastRow = entryRows[entryRows.length-1];
+    entryRows.push({weight: lastRow ? lastRow.weight : '', reps: ''});
     renderEntryRows();
   });
   function cancelEdit(){
