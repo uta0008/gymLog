@@ -91,6 +91,24 @@
   .daynav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
   .daynav .dtitle{font-weight:700;font-size:15px;}
   .daynav .dsub{font-size:11px;color:var(--text-muted);}
+  .timer-card{transition:background .3s ease;}
+  .timer-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;}
+  .timer-display{font-size:38px;color:var(--accent);letter-spacing:.02em;line-height:1;}
+  .timer-controls{display:flex;gap:8px;flex:none;}
+  .timerbtn{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;
+    padding:10px 14px;font-size:12.5px;font-family:inherit;cursor:pointer;white-space:nowrap;}
+  .timerbtn.primary{background:var(--blue);color:#08202F;border-color:var(--blue);font-weight:700;}
+  .timer-card.timer-done{animation:timerFlash .5s ease 3;}
+  @keyframes timerFlash{0%{background:var(--surface);}50%{background:var(--accent-dim);}100%{background:var(--surface);}}
+  .timer-presets{display:flex;gap:8px;margin-bottom:10px;}
+  .timer-presets button{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text-muted);
+    border-radius:8px;padding:8px 4px;font-size:12px;font-family:inherit;cursor:pointer;}
+  .timer-presets button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .timer-custom{display:flex;gap:8px;}
+  .timer-custom input{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
+  .timer-custom button{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;
+    padding:0 16px;font-size:13px;cursor:pointer;font-family:inherit;}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;}
   .field{margin-bottom:10px;}
   .field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:5px;}
@@ -172,6 +190,15 @@
   .goalrow{display:flex;align-items:center;gap:8px;}
   .gtotal{font-size:11px;color:var(--text-muted);margin-top:6px;padding-left:2px;}
   .gtotal b{color:var(--blue);font-weight:700;}
+  .gsuggest{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;}
+  .gsuggest-text{font-size:11px;color:var(--text-muted);}
+  .gsuggest-text b{color:var(--text);font-weight:700;}
+  .gsuggest-btn{flex:none;background:none;border:1px solid var(--blue);color:var(--blue);border-radius:6px;
+    padding:5px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;}
+  .field-row{display:flex;gap:10px;}
+  .field-row .field{flex:1;}
+  .profile-note{font-size:11px;color:var(--text-muted);margin-top:2px;}
   .goalrow .gname{width:64px;font-size:13px;font-weight:700;flex:none;}
   .goalrow .gfield{flex:1;}
   .goalrow .gfield label{font-size:9.5px;color:var(--text-muted);display:block;margin-bottom:3px;}
@@ -240,6 +267,25 @@
         </div>
         <button class="arrow" data-nav="log-next">›</button>
       </div>
+      <div class="card timer-card" id="timer-card">
+        <div class="timer-row">
+          <div class="timer-display num" id="timer-display">01:00</div>
+          <div class="timer-controls">
+            <button class="timerbtn primary" id="timer-start-btn" type="button">開始</button>
+            <button class="timerbtn" id="timer-reset-btn" type="button">リセット</button>
+          </div>
+        </div>
+        <div class="timer-presets" id="timer-presets">
+          <button data-sec="30" type="button">30秒</button>
+          <button data-sec="60" class="active" type="button">60秒</button>
+          <button data-sec="90" type="button">90秒</button>
+          <button data-sec="120" type="button">120秒</button>
+        </div>
+        <div class="timer-custom">
+          <input id="timer-custom-input" type="number" inputmode="numeric" min="1" step="1" placeholder="秒数を指定（例：45）">
+          <button id="timer-custom-btn" type="button">設定</button>
+        </div>
+      </div>
       <div class="card">
         <div class="field">
           <label>部位</label>
@@ -280,6 +326,13 @@
     </section>
 
     <section class="tab" id="tab-goals">
+      <div class="card" id="profile-card">
+        <div class="field-row">
+          <div class="field"><label>体重 (kg・任意)</label><input id="in-profile-weight" type="number" inputmode="decimal" min="0" step="0.5" placeholder="例：65"></div>
+          <div class="field"><label>身長 (cm・任意)</label><input id="in-profile-height" type="number" inputmode="decimal" min="0" step="0.5" placeholder="例：170"></div>
+        </div>
+        <div class="profile-note">体重を入力すると、初心者向けの推奨重量の精度が上がります</div>
+      </div>
       <div class="weeknav">
         <button class="arrow" data-nav="goal-prev">‹</button>
         <div class="range" id="goal-range"></div>
@@ -364,7 +417,8 @@
     workouts: [],   // {id,date,bodyPart,exercise,weight,sets}
     schedule: {},   // dateStr -> {planned:bool, actual:bool}
     goals: {},      // weekKey -> {bodyPart:{reps,weight}}  (reps=target total reps, weight=target kg per rep)
-    bodyParts: ['胸','背中','脚','腕','肩']
+    bodyParts: ['胸','背中','脚','腕','肩'],
+    profile: {weight:'', height:''}
   };
 
   var STORAGE_KEY = 'gymlog-state-v1';
@@ -387,6 +441,7 @@
         state.schedule = parsed.schedule || {};
         state.goals = parsed.goals || {};
         state.bodyParts = (parsed.bodyParts && parsed.bodyParts.length) ? parsed.bodyParts : state.bodyParts;
+        state.profile = parsed.profile || state.profile;
       }
     }catch(e){
       console.log('no existing data or read error', e);
@@ -692,6 +747,110 @@
   }
   document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
 
+  /* ---------- rest timer ---------- */
+  var timerDuration = 60;
+  var timerRemaining = 60;
+  var timerRunning = false;
+  var timerHandle = null;
+  var audioCtx = null;
+
+  function formatTimer(sec){
+    sec = Math.max(0, Math.round(sec));
+    var m = Math.floor(sec/60), s = sec%60;
+    return pad(m)+':'+pad(s);
+  }
+  function renderTimer(){
+    document.getElementById('timer-display').textContent = formatTimer(timerRemaining);
+    var btn = document.getElementById('timer-start-btn');
+    if(timerRunning){ btn.textContent = '一時停止'; }
+    else if(timerRemaining>0 && timerRemaining<timerDuration){ btn.textContent = '再開'; }
+    else { btn.textContent = '開始'; }
+  }
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ audioCtx = null; }
+    }
+    if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume().catch(function(){}); }
+    return audioCtx;
+  }
+  function beepOnce(delay){
+    var ctx = audioCtx;
+    if(!ctx) return;
+    setTimeout(function(){
+      try{
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.45);
+        o.start(); o.stop(ctx.currentTime+0.5);
+      }catch(e){}
+    }, delay);
+  }
+  function playTimerSound(){
+    ensureAudioCtx();
+    beepOnce(0); beepOnce(350); beepOnce(700);
+    if(navigator.vibrate){ try{ navigator.vibrate([200,120,200,120,200]); }catch(e){} }
+  }
+  function startTimer(){
+    if(timerRunning){ pauseTimer(); return; }
+    ensureAudioCtx();
+    if(timerRemaining<=0) timerRemaining = timerDuration;
+    timerRunning = true;
+    var last = Date.now();
+    timerHandle = setInterval(function(){
+      var now = Date.now();
+      timerRemaining -= (now-last)/1000;
+      last = now;
+      if(timerRemaining<=0){
+        timerRemaining = 0;
+        pauseTimer();
+        playTimerSound();
+        var card = document.getElementById('timer-card');
+        card.classList.add('timer-done');
+        setTimeout(function(){ card.classList.remove('timer-done'); }, 1600);
+      }
+      renderTimer();
+    }, 200);
+    renderTimer();
+  }
+  function pauseTimer(){
+    timerRunning = false;
+    if(timerHandle){ clearInterval(timerHandle); timerHandle = null; }
+    renderTimer();
+  }
+  function resetTimer(){
+    pauseTimer();
+    timerRemaining = timerDuration;
+    renderTimer();
+  }
+  document.getElementById('timer-start-btn').addEventListener('click', startTimer);
+  document.getElementById('timer-reset-btn').addEventListener('click', resetTimer);
+  document.querySelectorAll('#timer-presets button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      timerDuration = Number(btn.getAttribute('data-sec'));
+      timerRemaining = timerDuration;
+      document.querySelectorAll('#timer-presets button').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      pauseTimer();
+      renderTimer();
+    });
+  });
+  document.getElementById('timer-custom-btn').addEventListener('click', function(){
+    var inp = document.getElementById('timer-custom-input');
+    var v = Math.round(Number(inp.value));
+    if(v>0){
+      timerDuration = v;
+      timerRemaining = v;
+      document.querySelectorAll('#timer-presets button').forEach(function(b){ b.classList.remove('active'); });
+      pauseTimer();
+      renderTimer();
+      inp.value = '';
+    }
+  });
+  renderTimer();
+
   document.getElementById('in-part').addEventListener('change', function(){
     var p = this.value;
     updateExerciseSuggestions(p);
@@ -819,6 +978,44 @@
     }
   }
 
+  /* ---------- recommendation engine ---------- */
+  var BEGINNER_COEF = { '胸':0.5, '背中':0.6, '脚':0.75, '肩':0.3, '腕':0.25, '腹':0 };
+  var FLAT_BEGINNER_KG = { '胸':30, '背中':25, '脚':40, '肩':15, '腕':10, '腹':0 };
+  var BEGINNER_REPS = { '胸':60, '背中':60, '脚':80, '肩':40, '腕':40, '腹':80 };
+  function pastPerformance(part, weeksBack){
+    var totalReps=0, totalWeight=0, weeksWithData=0;
+    for(var i=1;i<=weeksBack;i++){
+      var mon = addDays(realWeekMonday, -7*i);
+      var a = actualForWeek(mon)[part];
+      if(a && a.reps>0){ totalReps += a.reps; totalWeight += a.weight; weeksWithData++; }
+    }
+    if(weeksWithData===0) return null;
+    return {
+      avgReps: totalReps/weeksWithData,
+      avgWeightPerRep: totalReps>0 ? totalWeight/totalReps : 0
+    };
+  }
+  function recommendationFor(part){
+    var perf = pastPerformance(part, 4);
+    if(perf){
+      var repsRec = Math.max(10, Math.round((perf.avgReps*1.05)/5)*5);
+      var weightRec = Math.round(perf.avgWeightPerRep*1.03*2)/2;
+      return {reps:repsRec, weight:weightRec, source:'history'};
+    }
+    var bw = Number(state.profile && state.profile.weight)||0;
+    var coef = BEGINNER_COEF[part];
+    var weightRec;
+    if(bw>0 && coef!==undefined){
+      weightRec = Math.round(bw*coef*2)/2;
+    } else if(FLAT_BEGINNER_KG[part]!==undefined){
+      weightRec = FLAT_BEGINNER_KG[part];
+    } else {
+      weightRec = 15;
+    }
+    var repsRec = BEGINNER_REPS[part] || 60;
+    return {reps:repsRec, weight:weightRec, source:'beginner'};
+  }
+
   /* ---------- rendering: GOALS ---------- */
   function renderGoals(){
     document.getElementById('goal-range').textContent = weekRangeLabel(goalWeek);
@@ -829,6 +1026,8 @@
     var html = state.bodyParts.map(function(p){
       var g = goals[p] || {reps:0, weight:0};
       var tw = targetTotalWeight(g);
+      var rec = recommendationFor(p);
+      var recLabel = rec.source==='history' ? '過去の実績から' : '初心者目安';
       return '<div class="goalrow-wrap">'+
         '<div class="goalrow">'+
         '<span class="gname">'+esc(p)+'</span>'+
@@ -837,6 +1036,8 @@
         '<button class="gdel" data-del-part="'+esc(p)+'">×</button>'+
         '</div>'+
         '<div class="gtotal">総重量目標：<b>'+Math.round(tw)+' kg</b>'+(g.reps>0&&g.weight>0?' （'+g.reps+'回 × '+g.weight+'kg）':'')+'</div>'+
+        '<div class="gsuggest"><span class="gsuggest-text">推奨 <b>'+rec.reps+'回 × '+rec.weight+'kg</b>（'+recLabel+'）</span>'+
+        '<button class="gsuggest-btn" data-apply-part="'+esc(p)+'" data-apply-reps="'+rec.reps+'" data-apply-weight="'+rec.weight+'">適用</button></div>'+
         '</div>';
     }).join('');
     listEl.innerHTML = html || '<div class="empty">部位がありません。下から追加してください。</div>';
@@ -873,7 +1074,26 @@
         scheduleSave(); renderGoals(); renderHome(); renderLog();
       });
     });
+    listEl.querySelectorAll('[data-apply-part]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var p = btn.getAttribute('data-apply-part');
+        var reps = Number(btn.getAttribute('data-apply-reps'))||0;
+        var weight = Number(btn.getAttribute('data-apply-weight'))||0;
+        if(!goals[p]) goals[p] = {reps:0, weight:0};
+        goals[p].reps = reps;
+        goals[p].weight = weight;
+        scheduleSave(); renderGoals(); renderHome();
+      });
+    });
   }
+  document.getElementById('in-profile-weight').addEventListener('input', function(){
+    state.profile.weight = this.value;
+    scheduleSave(); renderGoals();
+  });
+  document.getElementById('in-profile-height').addEventListener('input', function(){
+    state.profile.height = this.value;
+    scheduleSave();
+  });
   document.getElementById('copy-prev-btn').addEventListener('click', function(){
     var prevWk = weekKeyFor(addDays(goalWeek, -7));
     var curWk = weekKeyFor(goalWeek);
@@ -999,13 +1219,17 @@
   });
   document.getElementById('reset-btn').addEventListener('click', function(){
     if(!confirm('すべての記録・目標・カレンダー登録を削除します。よろしいですか？')) return;
-    state = { workouts:[], schedule:{}, goals:{}, bodyParts:['胸','背中','脚','腕','肩'] };
+    state = { workouts:[], schedule:{}, goals:{}, bodyParts:['胸','背中','脚','腕','肩'], profile:{weight:'',height:''} };
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    document.getElementById('in-profile-weight').value = '';
+    document.getElementById('in-profile-height').value = '';
     scheduleSave(); renderAll();
   });
 
   /* ---------- init ---------- */
   loadState(function(){
+    document.getElementById('in-profile-weight').value = state.profile.weight || '';
+    document.getElementById('in-profile-height').value = state.profile.height || '';
     renderAll();
     switchTab('home');
   });
