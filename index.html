@@ -504,6 +504,9 @@
 
   /* ---------- rendering: HOME ---------- */
   function renderHome(){
+    if(weekKeyFor(homeWeek)===weekKeyFor(realWeekMonday)){
+      autoFillGoalsForWeek(homeWeek);
+    }
     document.getElementById('home-range').textContent = weekRangeLabel(homeWeek);
     var goals = goalsForWeek(homeWeek);
     var actual = actualForWeek(homeWeek);
@@ -591,6 +594,21 @@
     var dl = document.getElementById('exercise-datalist');
     dl.innerHTML = exercisesForPart(p).map(function(ex){ return '<option value="'+esc(ex)+'">'; }).join('');
   }
+  function lastEntryForExercise(p, exercise){
+    if(!exercise) return null;
+    var list = workoutsForPartSorted(p).filter(function(w){ return w.exercise===exercise; });
+    return list.length ? list[0] : null;
+  }
+  function applyLastWeightDefault(p, exercise){
+    if(editingId) return;
+    var r = entryRows[0];
+    if(!r || r.weight!=='') return;
+    var last = lastEntryForExercise(p, exercise);
+    if(last && last.weight!==undefined && last.weight!==null && last.weight!==''){
+      entryRows[0].weight = String(last.weight);
+      renderEntryRows();
+    }
+  }
 
   /* ---------- rendering: LOG ---------- */
   var logExpandedParts = {};
@@ -610,6 +628,7 @@
       exField.value = lastExerciseForPart(curPart);
     }
     renderEntryRows();
+    applyLastWeightDefault(curPart, exField.value);
 
     var entries = state.workouts.filter(function(w){ return w.date===dstr; });
     var listEl = document.getElementById('log-list');
@@ -856,7 +875,14 @@
     updateExerciseSuggestions(p);
     if(!editingId){
       document.getElementById('in-exercise').value = lastExerciseForPart(p);
+      entryRows = [{weight:'', reps:''}];
+      renderEntryRows();
     }
+    applyLastWeightDefault(p, document.getElementById('in-exercise').value);
+  });
+
+  document.getElementById('in-exercise').addEventListener('input', function(){
+    applyLastWeightDefault(document.getElementById('in-part').value, this.value.trim());
   });
 
   document.getElementById('add-entry-btn').addEventListener('click', function(){
@@ -972,7 +998,9 @@
     var goEl = panel.querySelector('[data-goto-log]');
     if(goEl){
       goEl.addEventListener('click', function(){
+        cancelEdit();
         logDate = parseDateStr(goEl.getAttribute('data-goto-log'));
+        renderLog();
         switchTab('log');
       });
     }
@@ -1015,9 +1043,27 @@
     var repsRec = BEGINNER_REPS[part] || 60;
     return {reps:repsRec, weight:weightRec, source:'beginner'};
   }
+  function autoFillGoalsForWeek(monday){
+    var wk = weekKeyFor(monday);
+    if(state.goals[wk] && Object.keys(state.goals[wk]).length>0) return false;
+    var prevActual = actualForWeek(addDays(monday, -7));
+    var trainedParts = Object.keys(prevActual).filter(function(p){ return prevActual[p].reps>0; });
+    if(trainedParts.length===0) return false;
+    var newGoals = {};
+    trainedParts.forEach(function(p){
+      var rec = recommendationFor(p);
+      newGoals[p] = {reps: rec.reps, weight: rec.weight};
+    });
+    state.goals[wk] = newGoals;
+    scheduleSave();
+    return true;
+  }
 
   /* ---------- rendering: GOALS ---------- */
   function renderGoals(){
+    if(weekKeyFor(goalWeek)===weekKeyFor(realWeekMonday)){
+      autoFillGoalsForWeek(goalWeek);
+    }
     document.getElementById('goal-range').textContent = weekRangeLabel(goalWeek);
     var wk = weekKeyFor(goalWeek);
     if(!state.goals[wk]) state.goals[wk] = {};
