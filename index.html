@@ -83,6 +83,9 @@
   .remain{font-size:11px;color:var(--text-muted);margin-top:5px;}
   .remain b{color:var(--blue);font-weight:700;}
   .remain b.done{color:var(--accent);}
+  .weekdiff{font-size:12.5px;font-weight:700;margin-top:2px;color:var(--text-muted);}
+  .weekdiff.up{color:var(--accent);}
+  .weekdiff.down{color:var(--danger);}
 
   .empty{text-align:center;color:var(--text-muted);font-size:12.5px;padding:40px 20px;}
   .empty a{color:var(--blue);text-decoration:underline;cursor:pointer;}
@@ -212,6 +215,11 @@
     border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;}
   .addpart button{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;
     padding:0 16px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .backup-title{font-weight:700;font-size:13.5px;margin-bottom:4px;}
+  .backup-note{font-size:11px;color:var(--text-muted);margin-bottom:12px;}
+  .backup-btns{display:flex;gap:10px;}
+  .backupbtn{flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;
+    padding:10px;font-size:13px;font-family:inherit;cursor:pointer;}
 
   /* history */
   .part-chips{display:flex;gap:8px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px;}
@@ -345,6 +353,15 @@
           <input id="in-new-part" type="text" placeholder="部位を追加（例：前腕）">
           <button id="add-part-btn">追加</button>
         </div>
+      </div>
+      <div class="card" id="backup-card">
+        <div class="backup-title">データのバックアップ・引き継ぎ</div>
+        <div class="backup-note">ホーム画面に追加したアプリを新しいファイルに差し替えたときなど、記録をそのまま引き継げます。</div>
+        <div class="backup-btns">
+          <button class="backupbtn" id="export-btn" type="button">エクスポート</button>
+          <button class="backupbtn" id="import-btn" type="button">読み込む</button>
+        </div>
+        <input type="file" id="import-file-input" accept="application/json,.json" style="display:none;">
       </div>
     </section>
 
@@ -538,21 +555,23 @@
       var a = actual[p] || {reps:0,weight:0};
       var ach = isAchieved(t,a);
       var tw = targetTotalWeight(t);
-      var repsPct = t.reps>0 ? Math.min(100, Math.round(a.reps/t.reps*100)) : 100;
       var wtPct = tw>0 ? Math.min(100, Math.round(a.weight/tw*100)) : 100;
-      var remReps = Math.max(0, t.reps - a.reps);
       var remWt = Math.max(0, tw - a.weight);
+      var prevWeight = (actualForWeek(addDays(homeWeek,-7))[p] || {weight:0}).weight;
+      var diff = a.weight - prevWeight;
       html += '<div class="part-panel">'+
         '<div class="ph"><span class="pname">'+esc(p)+'</span>'+(ach?'<span class="badge">達成</span>':'')+'</div>';
-      if(t.reps>0){
-        html += '<div class="metric"><div class="mrow"><span>総回数</span><b>'+a.reps+' / '+t.reps+'</b></div>'+
-          '<div class="barbg"><div class="barfill'+(repsPct>=100?' done':'')+'" style="width:'+repsPct+'%"></div></div>'+
-          '<div class="remain">残り <b'+(remReps<=0?' class="done"':'')+'>'+remReps+' 回</b></div></div>';
-      }
       if(tw>0){
         html += '<div class="metric"><div class="mrow"><span>総重量</span><b>'+Math.round(a.weight)+' / '+Math.round(tw)+' kg</b></div>'+
           '<div class="barbg"><div class="barfill'+(wtPct>=100?' done':'')+'" style="width:'+wtPct+'%"></div></div>'+
           '<div class="remain">残り <b'+(remWt<=0?' class="done"':'')+'>'+Math.round(remWt)+' kg</b></div></div>';
+      }
+      if(prevWeight>0 || a.weight>0){
+        var diffSign = diff>0 ? '+' : '';
+        var diffClass = diff>0 ? 'up' : (diff<0 ? 'down' : '');
+        var diffIcon = diff>0 ? '⬆' : (diff<0 ? '⬇' : '');
+        html += '<div class="metric"><div class="mrow"><span>先週実績</span><b>'+Math.round(prevWeight)+' kg</b></div>'+
+          '<div class="weekdiff '+diffClass+'">今週 '+diffSign+Math.round(diff)+' kg '+diffIcon+'</div></div>';
       }
       html += '</div>';
     });
@@ -1270,6 +1289,77 @@
     document.getElementById('in-profile-weight').value = '';
     document.getElementById('in-profile-height').value = '';
     scheduleSave(); renderAll();
+  });
+
+  /* ---------- backup: export / import ---------- */
+  function exportData(){
+    var dataStr = JSON.stringify(state, null, 2);
+    var fileName = 'iron-log-backup-'+todayStr+'.json';
+    var blob = new Blob([dataStr], {type:'application/json'});
+    if(navigator.share && navigator.canShare){
+      try{
+        var file = new File([blob], fileName, {type:'application/json'});
+        if(navigator.canShare({files:[file]})){
+          navigator.share({files:[file], title:'重量記録バックアップ'}).catch(function(){});
+          return;
+        }
+      }catch(e){}
+    }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  }
+  function importDataFromObject(obj){
+    if(!obj || typeof obj!=='object') return;
+    var existingIds = {};
+    state.workouts.forEach(function(w){ existingIds[w.id]=true; });
+    (obj.workouts||[]).forEach(function(w){
+      if(w && w.id && !existingIds[w.id]){ state.workouts.push(w); existingIds[w.id]=true; }
+    });
+    Object.keys(obj.schedule||{}).forEach(function(d){
+      if(!state.schedule[d]) state.schedule[d] = {planned:false, actual:false};
+      state.schedule[d].planned = state.schedule[d].planned || !!obj.schedule[d].planned;
+      state.schedule[d].actual = state.schedule[d].actual || !!obj.schedule[d].actual;
+    });
+    Object.keys(obj.goals||{}).forEach(function(wk){
+      if(!state.goals[wk]) state.goals[wk] = {};
+      Object.keys(obj.goals[wk]).forEach(function(p){
+        if(!state.goals[wk][p]) state.goals[wk][p] = obj.goals[wk][p];
+      });
+    });
+    (obj.bodyParts||[]).forEach(function(p){
+      if(state.bodyParts.indexOf(p)<0) state.bodyParts.push(p);
+    });
+    if(obj.profile){
+      if(!state.profile.weight && obj.profile.weight) state.profile.weight = obj.profile.weight;
+      if(!state.profile.height && obj.profile.height) state.profile.height = obj.profile.height;
+    }
+  }
+  document.getElementById('export-btn').addEventListener('click', exportData);
+  document.getElementById('import-btn').addEventListener('click', function(){
+    document.getElementById('import-file-input').click();
+  });
+  document.getElementById('import-file-input').addEventListener('change', function(e){
+    var f = e.target.files[0];
+    if(!f) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var obj;
+      try{ obj = JSON.parse(reader.result); }
+      catch(err){ alert('ファイルの読み込みに失敗しました。正しいバックアップファイルか確認してください。'); e.target.value=''; return; }
+      if(confirm('バックアップの記録を、今のデータに追加で読み込みます。よろしいですか？')){
+        importDataFromObject(obj);
+        document.getElementById('in-profile-weight').value = state.profile.weight || '';
+        document.getElementById('in-profile-height').value = state.profile.height || '';
+        scheduleSave();
+        renderAll();
+        alert('読み込みが完了しました');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(f);
   });
 
   /* ---------- init ---------- */
